@@ -1,0 +1,132 @@
+// Microsoft Visual C++ generated resource script.
+//
+#include "resource.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#ifndef APSTUDIO_INVOKED
+#include "targetver.h"
+#endif
+#define APSTUDIO_HIDDEN_SYMBOLS
+#include "windows.h"
+#undef APSTUDIO_HIDDEN_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// Chinese (Simplified, PRC) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_CHS)
+LANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+IDI_CWTDGEN             ICON                    "CWTDGen.ico"
+
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE 
+BEGIN
+    "resource.h\0"
+END
+
+2 TEXTINCLUDE 
+BEGIN
+    "#ifndef APSTUDIO_INVOKED\r\n"
+    "#include ""targetver.h""\r\n"
+    "#endif\r\n"
+    "#define APSTUDIO_HIDDEN_SYMBOLS\r\n"
+    "#include ""windows.h""\r\n"
+    "#undef APSTUDIO_HIDDEN_SYMBOLS\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE 
+BEGIN
+    "\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_DIALOG DIALOGEX 0, 0, 318, 168
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
+EXSTYLE WS_EX_COMPOSITED
+CAPTION "Dialog"
+FONT 9, "Microsoft YaHei UI", 400, 0, 0x0
+BEGIN
+    CONTROL         "字体　━━━━━━━━━━━━━━━━━━━━━━━━━━━━",IDC_STATIC,"Static",SS_SIMPLE | WS_GROUP,6,6,132,8
+    EDITTEXT        IDC_FONT,6,18,78,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER
+    PUSHBUTTON      "选择...",IDC_SELECT_FONT,90,18,42,12
+    CONTROL         "符号字体　━━━━━━━━━━━━━━━━━━━━━━━━━",IDC_STATIC,"Static",SS_SIMPLE | WS_GROUP,6,30,132,8
+    EDITTEXT        IDC_SYMBOL_FONT,6,42,78,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER
+    PUSHBUTTON      "选择...",IDC_SELECT_SYMBOL_FONT,90,42,42,12
+    CONTROL         "引号样式　━━━━━━━━━━━━━━━━━━━━━━━━━",IDC_STATIC,"Static",SS_SIMPLE | WS_GROUP,6,54,132,8
+    CONTROL         "中式 (「」『』)",IDC_QUOTE_CN,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,6,66,60,10
+    CONTROL         "英式 (“”‘’)",IDC_QUOTE_EN,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,72,66,42,10
+    CONTROL         "渲染引擎　━━━━━━━━━━━━━━━━━━━━━━━━━",IDC_STATIC,"Static",SS_SIMPLE | WS_GROUP,6,78,132,8
+    CONTROL         "DirectWrite",IDC_DWRITE,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,6,90,48,10
+    CONTROL         "GDI",IDC_GDI,"Button",BS_AUTORADIOBUTTON | WS_TABSTOP,60,90,24,10
+    CONTROL         "选择游戏　━━━━━━━━━━━━━━━━━━━━━━━━━",IDC_STATIC,"Static",SS_SIMPLE | WS_GROUP,6,102,132,8
+    EDITTEXT        IDC_GAMEDIR,6,114,78,12,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER
+    PUSHBUTTON      "选择...",IDC_SELECT_DIR,90,114,42,12
+    CONTROL         "IV",IDC_GAME_IV,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,6,132,22,10
+    CONTROL         "TLAD",IDC_GAME_TLAD,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,30,132,33,10
+    CONTROL         "TBoGT",IDC_GAME_TBOGT,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,66,132,37,10
+    CONTROL         "预览　━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",IDC_STATIC,
+                    "Static",SS_SIMPLE | WS_GROUP,150,6,162,8
+    EDITTEXT        IDC_PREVIEW_TEXT,150,18,162,12,ES_AUTOHSCROLL
+    CONTROL         "",IDC_PREVIEW,"Static",SS_BITMAP | SS_CENTERIMAGE | WS_GROUP,150,36,162,126
+    PUSHBUTTON      "生成",IDC_GENERATE,90,150,48,12
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO
+BEGIN
+    IDD_DIALOG, DIALOG
+    BEGIN
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+#endif    // Chinese (Simplified, PRC) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED
+
