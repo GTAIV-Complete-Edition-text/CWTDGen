@@ -18,6 +18,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	THROW_IF_FAILED(D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED, &g_d2dFactory));
 	THROW_IF_FAILED(DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(g_dwriteFactory), g_dwriteFactory.put_unknown()));
 
+	ULONG_PTR token;
+	Gp::GdiplusStartupInput input;
+	THROW_IF_FAILED(HRESULT_FROM_GPSTATUS(Gp::GdiplusStartup(&token, &input, nullptr)));
+
 	return static_cast<int>(DialogBoxW(g_hInst, MAKEINTRESOURCEW(IDD_DIALOG), nullptr, DialogProc));
 }
 
@@ -63,7 +67,7 @@ bool CheckAndFixGTAIVPath(fs::path& path)
 	return true;
 }
 
-void UpdatePreview(HWND hWnd, std::wstring_view text, bool useGDI)
+void UpdatePreview(HWND hWnd, std::wstring_view text, bool useGDIP)
 {
 	if (text.empty())
 		return;
@@ -104,55 +108,21 @@ void UpdatePreview(HWND hWnd, std::wstring_view text, bool useGDI)
 	{
 		wil::unique_hdc hdc(CreateCompatibleDC(hdcWnd.get()));
 		THROW_HR_IF(E_FAIL, !hdc);
-		wil::unique_hbitmap hBitmap(CreateDIB(hdcWnd.get(), width, height, 32));
+		RGBQUAD* bmBits;
+		wil::unique_hbitmap hBitmap(CreateDIB(hdcWnd.get(), width, height, 32, reinterpret_cast<void**>(&bmBits)));
 		THROW_HR_IF(E_FAIL, !hBitmap);
 		auto selectBitmap = wil::SelectObject(hdc.get(), hBitmap.get());
 
-		// Draw checkered background
-		wil::unique_hbrush hBrush1(CreateSolidBrush(0x202020));
-		THROW_HR_IF(E_FAIL, !hBrush1);
-		wil::unique_hbrush hBrush2(CreateSolidBrush(0x303030));
-		THROW_HR_IF(E_FAIL, !hBrush2);
+		GDIDrawCheckeredBackground(hdc.get(), static_cast<LONG>(width), static_cast<LONG>(height), xChars, yChars);
+		SetBitmapAlpha(bmBits, width, height, 255);
 
-		RECT fillRect = { 0, 0, static_cast<LONG>(width), static_cast<LONG>(height) };
-		FillRect(hdc.get(), &fillRect, hBrush1.get());
-		for (uint32_t y = 0; y < yChars; ++y)
+		if (useGDIP)
 		{
-			for (uint32_t x = y % 2; x < xChars; x += 2)
-			{
-				fillRect.left = static_cast<LONG>(x * CHAR_WIDTH);
-				fillRect.top = static_cast<LONG>(y * CHAR_HEIGHT);
-				fillRect.right = fillRect.left + CHAR_WIDTH;
-				fillRect.bottom = fillRect.top + CHAR_HEIGHT;
-				FillRect(hdc.get(), &fillRect, hBrush2.get());
-			}
-		}
-
-		if (useGDI)
-		{
-			GDIDrawCharacters(hdc.get(), text, xChars, yChars);
+			GpDrawCharacters(hdc.get(), text, xChars, yChars);
 		}
 		else
 		{
-			wil::com_ptr<ID2D1DCRenderTarget> dcRenderTarget;
-			D2D1_RENDER_TARGET_PROPERTIES props = {
-				D2D1_RENDER_TARGET_TYPE_DEFAULT,
-				{
-					DXGI_FORMAT_B8G8R8A8_UNORM,
-					D2D1_ALPHA_MODE_IGNORE
-				},
-				0,
-				0,
-				D2D1_RENDER_TARGET_USAGE_NONE,
-				D2D1_FEATURE_LEVEL_DEFAULT
-			};
-			THROW_IF_FAILED(g_d2dFactory->CreateDCRenderTarget(&props, &dcRenderTarget));
-
-			RECT rect = { 0, 0, static_cast<LONG>(width), static_cast<LONG>(height) };
-			THROW_IF_FAILED(dcRenderTarget->BindDC(hdc.get(), &rect));
-			dcRenderTarget->BeginDraw();
-			DWriteDrawCharacters(dcRenderTarget.get(), text, xChars, yChars);
-			dcRenderTarget->EndDraw();
+			DWriteDrawCharacters(hdc.get(), width, height, text, xChars, yChars);
 		}
 
 		if (requireScale)
@@ -169,15 +139,7 @@ void UpdatePreview(HWND hWnd, std::wstring_view text, bool useGDI)
 				scaledWidth = width * scaledHeight / height;
 			}
 
-			wil::unique_hdc hdcScale(CreateCompatibleDC(hdcWnd.get()));
-			THROW_HR_IF(E_FAIL, !hdcScale);
-			wil::unique_hbitmap hBitmapScale(CreateCompatibleBitmap(hdcWnd.get(), scaledWidth, scaledHeight));
-			THROW_HR_IF(E_FAIL, !hBitmapScale);
-			auto selectScale = wil::SelectObject(hdcScale.get(), hBitmapScale.get());
-
-			SetStretchBltMode(hdcScale.get(), HALFTONE);
-			StretchBlt(hdcScale.get(), 0, 0, scaledWidth, scaledHeight, hdc.get(), 0, 0, width, height, SRCCOPY);
-
+			auto hBitmapScale = GDIScaleBitmap(hdcWnd.get(), hdc.get(), width, height, scaledWidth, scaledHeight);
 			hFinalBitmap = hBitmapScale.release();
 		}
 		else
@@ -195,7 +157,7 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 	case WM_INITDIALOG:
 	{
 		CheckRadioButton(hDlg, IDC_QUOTE_CN, IDC_QUOTE_EN, IDC_QUOTE_CN);
-		CheckRadioButton(hDlg, IDC_DWRITE, IDC_GDI, IDC_DWRITE);
+		CheckRadioButton(hDlg, IDC_DWRITE, IDC_GDIP, IDC_DWRITE);
 
 		CheckDlgButton(hDlg, IDC_GAME_IV, BST_CHECKED);
 		CheckDlgButton(hDlg, IDC_GAME_TLAD, BST_CHECKED);
@@ -222,6 +184,7 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 			if (font.has_value())
 			{
 				font->lfHeight = -64;
+				font->lfQuality = DEFAULT_QUALITY;
 				bool isFont = wmId == IDC_SELECT_FONT;
 				if (isFont)
 					g_font = *font;
@@ -260,10 +223,8 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 		}
 		break;
 		case IDC_GENERATE:
-		{
-			
-		}
-		break;
+			UpdatePreview(s_hPreview, GetWindowString(GetDlgItem(hDlg, IDC_PREVIEW_TEXT)), IsDlgButtonChecked(hDlg, IDC_GDIP));
+			break;
 		}
 		break;
 	}

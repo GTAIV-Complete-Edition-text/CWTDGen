@@ -3,6 +3,7 @@
 #include "resource.h"
 
 namespace fs = std::filesystem;
+namespace Gp = Gdiplus;
 
 constexpr int CHAR_WIDTH = 64;
 constexpr int CHAR_HEIGHT = 80;
@@ -17,5 +18,4 @@ LOGFONTW g_symbolFont = {};
 fs::path g_gamePath;
 
 #include "Util.hpp"
-#include "GDI.hpp"
-#include "DirectWrite.hpp"
+#include "Graphics.hpp"

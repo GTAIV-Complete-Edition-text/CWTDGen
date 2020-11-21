@@ -30,13 +30,10 @@
     <ClInclude Include="pch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="GDI.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Util.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="DirectWrite.hpp">
+    <ClInclude Include="Graphics.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -11,7 +11,7 @@
 #define IDC_QUOTE_CN                    1005
 #define IDC_QUOTE_EN                    1006
 #define IDC_DWRITE                      1007
-#define IDC_GDI                         1008
+#define IDC_GDIP                        1008
 #define IDC_GAMEDIR                     1009
 #define IDC_SELECT_DIR                  1010
 #define IDC_GAME_IV                     1011
