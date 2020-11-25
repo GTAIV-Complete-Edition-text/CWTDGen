@@ -18,4 +18,10 @@
 #include <wil/resource.h>
 #include <wil/com.h>
 
+#include <DirectXTex.h>
+
+#include <zlib.h>
+using unique_z_stream_inflate = wil::unique_struct<z_stream, decltype(&inflateEnd), inflateEnd>;
+using unique_z_stream_deflate = wil::unique_struct<z_stream, decltype(&deflateEnd), deflateEnd>;
+
 #endif //PCH_H

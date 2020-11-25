@@ -19,3 +19,4 @@ fs::path g_gamePath;
 
 #include "Util.hpp"
 #include "Graphics.hpp"
+#include "RageUtil.hpp"

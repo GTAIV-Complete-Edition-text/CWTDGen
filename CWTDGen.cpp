@@ -223,8 +223,28 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 		}
 		break;
 		case IDC_GENERATE:
-			UpdatePreview(s_hPreview, GetWindowString(GetDlgItem(hDlg, IDC_PREVIEW_TEXT)), IsDlgButtonChecked(hDlg, IDC_GDIP));
-			break;
+		{
+			wil::unique_hfile hFile(CreateFileW(L"fonts.wtd", GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+
+			auto [header, data] = RageUtil::RSC5::ReadFromFile(hFile.get());
+			RageUtil::s_virtual = { data.get(), header.GetVirtualSize() };
+			RageUtil::s_physical = { data.get() + RageUtil::s_virtual.size(), header.GetPhysicalSize() };
+
+			auto dict = reinterpret_cast<RageUtil::pgDictionary<RageUtil::grcTexturePC>*>(data.get());
+
+			RageUtil::RSC5::BlockList bm;
+			dict->DumpToMemory(bm);
+
+			RageUtil::s_virtual = {};
+			RageUtil::s_physical = {};
+			RageUtil::s_ptrTable.clear();
+
+			hFile.reset(CreateFileW(L"fonts1.wtd", GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+			RageUtil::RSC5::DumpToFile(hFile.get(), header, bm);
+
+			//UpdatePreview(s_hPreview, GetWindowString(GetDlgItem(hDlg, IDC_PREVIEW_TEXT)), IsDlgButtonChecked(hDlg, IDC_GDIP));
+		}
+		break;
 		}
 		break;
 	}
