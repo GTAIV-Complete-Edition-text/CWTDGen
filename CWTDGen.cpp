@@ -232,6 +232,13 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 
 			auto dict = reinterpret_cast<RageUtil::pgDictionary<RageUtil::grcTexturePC>*>(data.get());
 
+			auto texture = *dict->values.data.Get()->Get(); // copy
+			texture.name.Set("pack:/fontx.dds");
+			texture.next = 0;
+			texture.prev = 0;
+
+			auto containers = dict->Insert(RageUtil::HashString("fontx"), &texture);
+
 			RageUtil::RSC5::BlockList bm;
 			dict->DumpToMemory(bm);
 

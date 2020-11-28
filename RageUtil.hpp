@@ -60,7 +60,7 @@ namespace RageUtil
 					shift++;
 				}
 
-				// pad non-even sizes
+				// Pad non-even sizes
 				if (base & 1)
 				{
 					base++;
@@ -240,14 +240,15 @@ namespace RageUtil
 
 		void Set(const T* ptr)
 		{
+			auto voidPtr = reinterpret_cast<void*>(const_cast<T*>(ptr));
 			if (blockType == pgPtrBlockType::Memory)
 			{
-				s_ptrTable[static_cast<size_t>(offset)] = ptr;
+				s_ptrTable[static_cast<size_t>(offset)] = voidPtr;
 			}
 			else
 			{
 				auto index = s_ptrTable.size();
-				s_ptrTable.emplace_back(ptr);
+				s_ptrTable.emplace_back(voidPtr);
 
 				offset = static_cast<uint32_t>(index);
 				blockType = pgPtrBlockType::Memory;
@@ -256,10 +257,6 @@ namespace RageUtil
 
 		void SetOffset(uint32_t off, pgPtrBlockType type = DefaultBlockType)
 		{
-			if (blockType == pgPtrBlockType::Memory)
-			{
-				s_ptrTable.erase(s_ptrTable.begin() + static_cast<size_t>(offset));
-			}
 			offset = off;
 			blockType = type;
 		}
@@ -271,19 +268,48 @@ namespace RageUtil
 	template<typename T>
 	struct pgArray
 	{
-		pgPtr<T> pointer;
+		pgPtr<T> data;
 		uint16_t size;
 		uint16_t capacity;
+
+		[[nodiscard]] auto InsertSorted(T value)
+		{
+			auto ptr = data.Get();
+			std::vector<T> container;
+			container.reserve(static_cast<size_t>(size) + 1);
+			container.assign(ptr, ptr + size);
+
+			// Assume the data is sorted
+			auto it = std::lower_bound(container.cbegin(), container.cend(), value);
+			size_t pos = it - container.cbegin();
+			container.insert(it, value);
+
+			data.Set(container.data());
+			++size;
+			capacity = size;
+
+			return std::make_pair(std::move(container), pos);
+		}
+
+		[[nodiscard]] auto InsertAt(size_t pos, T value)
+		{
+			auto ptr = data.Get();
+			std::vector<T> container;
+			container.reserve(static_cast<size_t>(size) + 1);
+			container.assign(ptr, ptr + size);
+			container.insert(container.cbegin() + pos, value);
+
+			data.Set(container.data());
+			++size;
+			capacity = size;
+
+			return container;
+		}
 	};
 	static_assert(sizeof(pgArray<int>) == 8);
 
 	template<typename T>
-	struct pgObjectArray
-	{
-		pgPtr<pgPtr<T>> objects;
-		uint16_t size;
-		uint16_t capacity;
-	};
+	using pgObjectArray = pgArray<pgPtr<T>>;
 	static_assert(sizeof(pgObjectArray<int>) == 8);
 
 	struct datBase
@@ -323,6 +349,15 @@ namespace RageUtil
 		pgArray<uint32_t> hashes;
 		pgObjectArray<T> values;
 
+		[[nodiscard]] auto Insert(uint32_t hash, T* value)
+		{
+			auto [hashContainer, pos] = hashes.InsertSorted(hash);
+			pgPtr<T> ptr;
+			ptr.Set(value);
+			auto valueContainer = values.InsertAt(pos, ptr);
+			return std::make_pair(std::move(hashContainer), std::move(valueContainer));
+		}
+
 		void DumpToMemory(RSC5::BlockList& blockList)
 		{
 			blockList.AppendVirtual(this, sizeof(pgDictionary));
@@ -333,7 +368,7 @@ namespace RageUtil
 			const auto size = static_cast<size_t>(values.size);
 			const auto objects = std::make_unique<T*[]>(size);
 
-			const auto objsPtr = values.objects.Get();
+			const auto objsPtr = values.data.Get();
 			for (size_t i = 0; i < size; ++i)
 			{
 				const auto object = objsPtr[i].Get();
@@ -348,11 +383,11 @@ namespace RageUtil
 			}
 
 			assert(size == hashes.size);
-			offset = blockList.AppendVirtual(hashes.pointer.Get(), static_cast<uint32_t>(sizeof(uint32_t) * size));
-			hashes.pointer.SetOffset(offset);
+			offset = blockList.AppendVirtual(hashes.data.Get(), static_cast<uint32_t>(sizeof(uint32_t) * size));
+			hashes.data.SetOffset(offset);
 
 			offset = blockList.AppendVirtual(objsPtr, static_cast<uint32_t>(sizeof(pgPtr<T>) * size));
-			values.objects.SetOffset(offset);
+			values.data.SetOffset(offset);
 		}
 	};
 	static_assert(sizeof(pgDictionary<int>) == 32);
@@ -412,4 +447,20 @@ namespace RageUtil
 		}
 	};
 	static_assert(sizeof(grcTexturePC) == 80);
+
+	constexpr uint32_t HashString(const char* string, uint32_t hash = 0)
+	{
+		for (; *string; ++string)
+		{
+			hash += *string;
+			hash += (hash << 10);
+			hash ^= (hash >> 6);
+		}
+
+		hash += (hash << 3);
+		hash ^= (hash >> 11);
+		hash += (hash << 15);
+
+		return hash;
+	}
 }
