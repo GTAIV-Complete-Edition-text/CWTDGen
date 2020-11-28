@@ -262,6 +262,9 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 			CATCH_LOG();
 		}
 		break;
+		case IDC_GENERATE_PREVIEW:
+			UpdatePreview(s_hPreview, GetWindowString(GetDlgItem(hDlg, IDC_PREVIEW_TEXT)), IsDlgButtonChecked(hDlg, IDC_GDIP));
+			break;
 		case IDC_GENERATE:
 		{
 			wil::unique_hfile hFile(CreateFileW(L"fonts.wtd", GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
@@ -288,8 +291,6 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 
 			hFile.reset(CreateFileW(L"fonts1.wtd", GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
 			RageUtil::RSC5::DumpToFile(hFile.get(), header, bm);
-
-			//UpdatePreview(s_hPreview, GetWindowString(GetDlgItem(hDlg, IDC_PREVIEW_TEXT)), IsDlgButtonChecked(hDlg, IDC_GDIP));
 		}
 		break;
 		}
