@@ -185,12 +185,19 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 			{
 				font->lfHeight = -64;
 				font->lfQuality = DEFAULT_QUALITY;
-				bool isFont = wmId == IDC_SELECT_FONT;
-				if (isFont)
+				switch (wmId)
+				{
+				case IDC_SELECT_FONT:
 					g_font = *font;
-				else
+					SetDlgItemTextW(hDlg, IDC_FONT, font->lfFaceName);
+					if (*g_symbolFont.lfFaceName)
+						break;
+					[[fallthrough]];
+				case IDC_SELECT_SYMBOL_FONT:
 					g_symbolFont = *font;
-				SetDlgItemTextW(hDlg, isFont ? IDC_FONT : IDC_SYMBOL_FONT, font->lfFaceName);
+					SetDlgItemTextW(hDlg, IDC_SYMBOL_FONT, font->lfFaceName);
+					break;
+				}
 			}
 		}
 		break;
