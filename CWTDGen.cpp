@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include "CWTDGen.h"
 
 INT_PTR CALLBACK DialogProc(HWND, UINT, WPARAM, LPARAM);
@@ -196,6 +196,39 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 		break;
 		case IDC_SELECT_DIR:
 		{
+			std::wstring buf(512, L'\0');
+			do
+			{
+				DWORD size = static_cast<DWORD>(buf.size() * sizeof(wchar_t));
+				if (LOG_IF_WIN32_ERROR(RegGetValueW(HKEY_LOCAL_MACHINE, LR"(Software\Rockstar Games\Grand Theft Auto IV)", L"InstallFolder", RRF_RT_REG_SZ | RRF_SUBKEY_WOW6432KEY, nullptr, buf.data(), &size)) == ERROR_SUCCESS)
+				{
+					buf.resize(size / 2 - 1);
+					break;
+				}
+
+				size = static_cast<DWORD>(buf.size() * sizeof(wchar_t));
+				if (LOG_IF_WIN32_ERROR(RegGetValueW(HKEY_LOCAL_MACHINE, LR"(Software\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 12210)", L"InstallLocation", RRF_RT_REG_SZ, nullptr, buf.data(), &size)) == ERROR_SUCCESS)
+				{
+					buf.resize(size / 2 - 1);
+					break;
+				}
+
+				buf.clear();
+			} while (0);
+
+			if (!buf.empty())
+			{
+				fs::path path(std::move(buf));
+				if (CheckAndFixGTAIVPath(path))
+				{
+					g_gamePath = std::move(path);
+					SetDlgItemTextW(hDlg, IDC_GAMEDIR, g_gamePath.c_str());
+				}
+			}
+		}
+		break;
+		case IDM_SELECT_DIR:
+		{
 			try
 			{
 				auto fileDlg = wil::CoCreateInstance<IFileDialog>(CLSID_FileOpenDialog);
@@ -250,6 +283,22 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 			RageUtil::RSC5::DumpToFile(hFile.get(), header, bm);
 
 			//UpdatePreview(s_hPreview, GetWindowString(GetDlgItem(hDlg, IDC_PREVIEW_TEXT)), IsDlgButtonChecked(hDlg, IDC_GDIP));
+		}
+		break;
+		}
+		break;
+	case WM_NOTIFY:
+		switch (reinterpret_cast<LPNMHDR>(lParam)->code)
+		{
+		case BCN_DROPDOWN:
+		{
+			auto dropDown = reinterpret_cast<LPNMBCDROPDOWN>(lParam);
+			POINT pt = { dropDown->rcButton.left, dropDown->rcButton.bottom };
+			ClientToScreen(dropDown->hdr.hwndFrom, &pt);
+
+			wil::unique_hmenu hMenu(CreatePopupMenu());
+			AppendMenuW(hMenu.get(), 0, IDM_SELECT_DIR, L"手动选择...");
+			TrackPopupMenu(hMenu.get(), TPM_LEFTALIGN | TPM_TOPALIGN, pt.x, pt.y, 0, hDlg, nullptr);
 		}
 		break;
 		}

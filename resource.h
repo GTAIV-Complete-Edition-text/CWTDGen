@@ -20,6 +20,7 @@
 #define IDC_PREVIEW_TEXT                1014
 #define IDC_PREVIEW                     1015
 #define IDC_GENERATE                    1016
+#define IDM_SELECT_DIR                  1017
 #define IDC_STATIC                      -1
 
 // Next default values for new objects
