@@ -263,10 +263,51 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 		}
 		break;
 		case IDC_GENERATE_PREVIEW:
-			UpdatePreview(s_hPreview, GetWindowString(GetDlgItem(hDlg, IDC_PREVIEW_TEXT)), IsDlgButtonChecked(hDlg, IDC_GDIP));
+			UpdatePreview(s_hPreview, GetWindowString(GetDlgItem(hDlg, IDC_PREVIEW_TEXT)), IsDlgButtonChecked(hDlg, IDC_GDIP) == BST_CHECKED);
 			break;
 		case IDC_GENERATE:
 		{
+			std::wstring chars;
+			{
+				wil::unique_hfile hCharsFile(CreateFileW(L"characters.txt", GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+				chars = ReadTextToUtf16String(hCharsFile.get());
+			}
+
+			bool useGDIP = IsDlgButtonChecked(hDlg, IDC_GDIP) == BST_CHECKED;
+
+			DirectX::ScratchImage dxt5Img;
+			{
+				auto hdcWnd = wil::GetDC(hDlg);
+				THROW_HR_IF(E_FAIL, !hdcWnd);
+				wil::unique_hdc hdc(CreateCompatibleDC(hdcWnd.get()));
+				THROW_HR_IF(E_FAIL, !hdc);
+				uint8_t* bmBits;
+				wil::unique_hbitmap hBitmap(CreateDIB(hdcWnd.get(), TEXTURE_WIDTH, TEXTURE_HEIGHT, 32, reinterpret_cast<void**>(&bmBits)));
+				THROW_HR_IF(E_FAIL, !hBitmap);
+				auto selectBitmap = wil::SelectObject(hdc.get(), hBitmap.get());
+
+				std::fill_n(bmBits, TEXTURE_WIDTH * TEXTURE_HEIGHT * 4, '\0');
+
+				if (useGDIP)
+				{
+					GpDrawCharacters(hdc.get(), chars, TEXTURE_XCHARS, TEXTURE_YCHARS);
+				}
+				else
+				{
+					DWriteDrawCharacters(hdc.get(), TEXTURE_WIDTH, TEXTURE_HEIGHT, chars, TEXTURE_XCHARS, TEXTURE_YCHARS);
+				}
+
+				DirectX::Image img = {
+					.width = TEXTURE_WIDTH,
+					.height = TEXTURE_HEIGHT,
+					.format = DXGI_FORMAT_B8G8R8A8_UNORM,
+					.rowPitch = TEXTURE_WIDTH * 4,
+					.slicePitch = TEXTURE_WIDTH * TEXTURE_HEIGHT * 4,
+					.pixels = bmBits
+				};
+				THROW_IF_FAILED(DirectX::Compress(img, DXGI_FORMAT_BC3_UNORM, DirectX::TEX_COMPRESS_PARALLEL, DirectX::TEX_THRESHOLD_DEFAULT, dxt5Img));
+			}
+
 			wil::unique_hfile hFile(CreateFileW(L"fonts.wtd", GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
 
 			auto [header, data] = RageUtil::RSC5::ReadFromFile(hFile.get());
@@ -276,11 +317,16 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 			auto dict = reinterpret_cast<RageUtil::pgDictionary<RageUtil::grcTexturePC>*>(data.get());
 
 			auto texture = *dict->values.data.Get()->Get(); // copy
-			texture.name.Set("pack:/fontx.dds");
+			texture.name.Set("pack:/font_chs.dds");
+			texture.width = TEXTURE_WIDTH;
+			texture.height = TEXTURE_HEIGHT;
+			texture.pixelFormat = D3DFMT_DXT5;
+			texture.stride = TEXTURE_WIDTH;
 			texture.next = 0;
 			texture.prev = 0;
+			texture.pixelData.Set(dxt5Img.GetPixels());
 
-			auto containers = dict->Insert(RageUtil::HashString("fontx"), &texture);
+			auto containers = dict->Insert(RageUtil::HashString("font_chs"), &texture);
 
 			RageUtil::RSC5::BlockList bm;
 			dict->DumpToMemory(bm);
@@ -289,7 +335,7 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 			RageUtil::s_physical = {};
 			RageUtil::s_ptrTable.clear();
 
-			hFile.reset(CreateFileW(L"fonts1.wtd", GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+			hFile.reset(CreateFileW(L"fonts_chs.wtd", GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
 			RageUtil::RSC5::DumpToFile(hFile.get(), header, bm);
 		}
 		break;

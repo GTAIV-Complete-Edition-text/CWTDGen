@@ -52,3 +52,59 @@ inline uint32_t RoundUp(uint32_t i)
 	static_assert(multiple && ((multiple & (multiple - 1)) == 0));
 	return (i + (multiple - 1)) & ~(multiple - 1);
 }
+
+// https://msdn.microsoft.com/en-us/magazine/mt763237
+std::wstring Utf8ToUtf16(std::string_view utf8)
+{
+	if (utf8.empty())
+	{
+		return {};
+	}
+
+	constexpr DWORD kFlags = MB_ERR_INVALID_CHARS;
+	const int utf8Length = static_cast<int>(utf8.length());
+	const int utf16Length = MultiByteToWideChar(
+		CP_UTF8,
+		kFlags,
+		utf8.data(),
+		utf8Length,
+		nullptr,
+		0
+	);
+	THROW_LAST_ERROR_IF(utf16Length == 0);
+
+	std::wstring utf16(utf16Length, L'\0');
+	const int result = MultiByteToWideChar(
+		CP_UTF8,
+		kFlags,
+		utf8.data(),
+		utf8Length,
+		utf16.data(),
+		utf16Length
+	);
+	THROW_LAST_ERROR_IF(result == 0);
+
+	return utf16;
+}
+
+std::wstring ReadTextToUtf16String(HANDLE hFile)
+{
+	constexpr size_t ChunkSize = 16384;
+	std::vector<uint8_t> data;
+	DWORD read = 0;
+	do
+	{
+		auto offset = data.size();
+		data.resize(offset + ChunkSize);
+
+		read = 0;
+		THROW_IF_WIN32_BOOL_FALSE(ReadFile(hFile, data.data() + offset, ChunkSize, &read, nullptr));
+		data.resize(offset + static_cast<size_t>(read));
+	} while (read != 0);
+	THROW_HR_IF(E_INVALIDARG, data.size() < 4);
+	if (data[0] == 0xef && data[1] == 0xbb && data[2] == 0xbf) // UTF-8 BOM
+		return Utf8ToUtf16(std::string_view(reinterpret_cast<const char*>(data.data() + 3), data.size() - 3));
+	else if (data[0] == 0xff && data[1] == 0xFE) // UTF-16LE BOM
+		return std::wstring(reinterpret_cast<const wchar_t*>(data.data() + 2), data.size() / 2 - 1);
+	return Utf8ToUtf16(std::string_view(reinterpret_cast<const char*>(data.data()), data.size())); // Treat data as UTF-8
+}

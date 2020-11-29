@@ -164,6 +164,9 @@ void GpDrawCharacters(HDC hdc, std::wstring_view text, uint32_t xChars, uint32_t
 	{
 		for (uint32_t x = 0; x < xChars && i < text.size(); ++x, ++i)
 		{
+			while (i < text.size() && IGNORE_SET.contains(text[i]))
+				++i;
+
 			bool isSymbol = SYMBOL_SET.contains(text[i]);
 
 			Gp::RectF rect(static_cast<Gp::REAL>(x * CHAR_WIDTH), static_cast<Gp::REAL>(y * CHAR_HEIGHT), CHAR_WIDTH, CHAR_HEIGHT);
@@ -180,7 +183,7 @@ void DWriteDrawCharacters(ID2D1RenderTarget* renderTarget, std::wstring_view tex
 	THROW_IF_FAILED(textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_FAR));
 
 	wil::com_ptr<IDWriteTextFormat> symbolTextFormat;
-	THROW_IF_FAILED(g_dwriteFactory->CreateTextFormat(g_symbolFont.lfFaceName, nullptr, static_cast<DWRITE_FONT_WEIGHT>(g_symbolFont.lfWeight), DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, fontSize, L"", &textFormat));
+	THROW_IF_FAILED(g_dwriteFactory->CreateTextFormat(g_symbolFont.lfFaceName, nullptr, static_cast<DWRITE_FONT_WEIGHT>(g_symbolFont.lfWeight), DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, fontSize, L"", &symbolTextFormat));
 	THROW_IF_FAILED(textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER));
 	THROW_IF_FAILED(textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_FAR));
 
@@ -192,6 +195,9 @@ void DWriteDrawCharacters(ID2D1RenderTarget* renderTarget, std::wstring_view tex
 	{
 		for (uint32_t x = 0; x < xChars && i < text.size(); ++x, ++i)
 		{
+			while (i < text.size() && IGNORE_SET.contains(text[i]))
+				++i;
+
 			bool isSymbol = SYMBOL_SET.contains(text[i]);
 
 			D2D1_RECT_F rect;
