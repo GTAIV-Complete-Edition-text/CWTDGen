@@ -139,7 +139,7 @@ void GDIDrawCharacters(HDC hdc, std::wstring_view text, uint32_t xChars, uint32_
 	}
 }
 
-void GpDrawCharacters(HDC hdc, std::wstring_view text, uint32_t xChars, uint32_t yChars)
+void GpDrawCharacters(HDC hdc, std::wstring_view text, uint32_t xChars, uint32_t yChars, bool replaceChars)
 {
 	Gp::Graphics graphics(hdc);
 	THROW_IF_FAILED(HRESULT_FROM_GPSTATUS(graphics.GetLastStatus()));
@@ -170,12 +170,20 @@ void GpDrawCharacters(HDC hdc, std::wstring_view text, uint32_t xChars, uint32_t
 			bool isSymbol = SymbolSet.contains(text[i]);
 
 			Gp::RectF rect(static_cast<Gp::REAL>(x * CharWidth), static_cast<Gp::REAL>(y * CharHeight), CharWidth, CharHeight);
-			graphics.DrawString(&text[i], 1, isSymbol ? &symbolFont : &font, rect, &format, &brush);
+
+			wchar_t ch = text[i];
+			if (replaceChars)
+			{
+				if (auto it = ReplaceMap.find(ch); it != ReplaceMap.end())
+					ch = it->second;
+			}
+
+			graphics.DrawString(&ch, 1, isSymbol ? &symbolFont : &font, rect, &format, &brush);
 		}
 	}
 }
 
-void DWriteDrawCharacters(ID2D1RenderTarget* renderTarget, std::wstring_view text, uint32_t xChars, uint32_t yChars, float fontSize = 64.0f)
+void DWriteDrawCharacters(ID2D1RenderTarget* renderTarget, std::wstring_view text, uint32_t xChars, uint32_t yChars, bool replaceChars, float fontSize = 64.0f)
 {
 	wil::com_ptr<IDWriteTextFormat> textFormat;
 	THROW_IF_FAILED(g_dwriteFactory->CreateTextFormat(g_font.lfFaceName, nullptr, static_cast<DWRITE_FONT_WEIGHT>(g_font.lfWeight), DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, fontSize, L"", &textFormat));
@@ -206,12 +214,19 @@ void DWriteDrawCharacters(ID2D1RenderTarget* renderTarget, std::wstring_view tex
 			rect.right = rect.left + CharWidth;
 			rect.bottom = rect.top + CharHeight;
 
-			renderTarget->DrawText(&text[i], 1, isSymbol ? symbolTextFormat.get() : textFormat.get(), rect, brush.get());
+			wchar_t ch = text[i];
+			if (replaceChars)
+			{
+				if (auto it = ReplaceMap.find(ch); it != ReplaceMap.end())
+					ch = it->second;
+			}
+
+			renderTarget->DrawText(&ch, 1, isSymbol ? symbolTextFormat.get() : textFormat.get(), rect, brush.get());
 		}
 	}
 }
 
-void DWriteDrawCharacters(HDC hdc, LONG width, LONG height, std::wstring_view text, uint32_t xChars, uint32_t yChars, float fontSize = 64.0f)
+void DWriteDrawCharacters(HDC hdc, LONG width, LONG height, std::wstring_view text, uint32_t xChars, uint32_t yChars, bool replaceChars, float fontSize = 64.0f)
 {
 	wil::com_ptr<ID2D1DCRenderTarget> dcRenderTarget;
 	D2D1_RENDER_TARGET_PROPERTIES props = {
@@ -230,6 +245,6 @@ void DWriteDrawCharacters(HDC hdc, LONG width, LONG height, std::wstring_view te
 	THROW_IF_FAILED(dcRenderTarget->BindDC(hdc, &rect));
 
 	dcRenderTarget->BeginDraw();
-	DWriteDrawCharacters(dcRenderTarget.get(), text, xChars, yChars, fontSize);
+	DWriteDrawCharacters(dcRenderTarget.get(), text, xChars, yChars, replaceChars, fontSize);
 	dcRenderTarget->EndDraw();
 }

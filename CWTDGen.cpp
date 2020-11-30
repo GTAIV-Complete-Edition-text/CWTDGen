@@ -67,7 +67,7 @@ bool CheckAndFixGTAIVPath(fs::path& path)
 	return true;
 }
 
-void UpdatePreview(HWND hWnd, std::wstring_view text, bool useGDIP)
+void UpdatePreview(HWND hWnd, std::wstring_view text, bool useGDIP, bool replaceChars)
 {
 	if (text.empty())
 		return;
@@ -118,11 +118,11 @@ void UpdatePreview(HWND hWnd, std::wstring_view text, bool useGDIP)
 
 		if (useGDIP)
 		{
-			GpDrawCharacters(hdc.get(), text, xChars, yChars);
+			GpDrawCharacters(hdc.get(), text, xChars, yChars, replaceChars);
 		}
 		else
 		{
-			DWriteDrawCharacters(hdc.get(), width, height, text, xChars, yChars);
+			DWriteDrawCharacters(hdc.get(), width, height, text, xChars, yChars, replaceChars);
 		}
 
 		if (requireScale)
@@ -263,7 +263,7 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 		}
 		break;
 		case IDC_GENERATE_PREVIEW:
-			UpdatePreview(s_hPreview, GetWindowString(GetDlgItem(hDlg, IDC_PREVIEW_TEXT)), IsDlgButtonChecked(hDlg, IDC_GDIP) == BST_CHECKED);
+			UpdatePreview(s_hPreview, GetWindowString(GetDlgItem(hDlg, IDC_PREVIEW_TEXT)), IsDlgButtonChecked(hDlg, IDC_GDIP) == BST_CHECKED, IsDlgButtonChecked(hDlg, IDC_QUOTE_EN) == BST_CHECKED);
 			break;
 		case IDC_GENERATE:
 		{
@@ -274,6 +274,7 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 			}
 
 			bool useGDIP = IsDlgButtonChecked(hDlg, IDC_GDIP) == BST_CHECKED;
+			bool replaceChars = IsDlgButtonChecked(hDlg, IDC_QUOTE_EN) == BST_CHECKED;
 
 			DirectX::ScratchImage dxt5Img;
 			{
@@ -290,11 +291,11 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 
 				if (useGDIP)
 				{
-					GpDrawCharacters(hdc.get(), chars, TextureXChars, TextureYChars);
+					GpDrawCharacters(hdc.get(), chars, TextureXChars, TextureYChars, replaceChars);
 				}
 				else
 				{
-					DWriteDrawCharacters(hdc.get(), TextureWidth, TextureHeight, chars, TextureXChars, TextureYChars);
+					DWriteDrawCharacters(hdc.get(), TextureWidth, TextureHeight, chars, TextureXChars, TextureYChars, replaceChars);
 				}
 
 				DirectX::Image img = {

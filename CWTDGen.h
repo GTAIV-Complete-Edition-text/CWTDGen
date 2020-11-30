@@ -13,6 +13,7 @@ constexpr uint32_t TextureXChars = TextureWidth / CharWidth;
 constexpr uint32_t TextureYChars = TextureHeight / CharHeight;
 static const std::unordered_set<wchar_t> SymbolSet = { L'—', L'　', L'、', L'。', L'《', L'》', L'「', L'」', L'『', L'』', L'！', L'，', L'－', L'．', L'：', L'；', L'？', L'～' };
 static const std::unordered_set<wchar_t> IgnoreSet = { L'\n', L'\r' };
+static const std::unordered_map<wchar_t, wchar_t> ReplaceMap = { {L'「', L'“'}, {L'」', L'”'}, {L'『', L'‘'}, {L'』', L'’'} };
 
 HINSTANCE g_hInst;
 fs::path g_exePath;
