@@ -321,8 +321,8 @@ namespace RageUtil
 	// Repersent file format
 	struct BlockMap
 	{
-		uint16_t virtualSize; // 0
-		uint16_t physicalSize; // 0
+		uint16_t virtualCount; // 0
+		uint16_t physicalCount; // 0
 
 		struct pgBlockInfo
 		{
