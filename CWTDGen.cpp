@@ -76,7 +76,7 @@ void UpdatePreview(HWND hWnd, std::wstring_view text, bool useGDIP)
 	THROW_IF_WIN32_BOOL_FALSE(GetClientRect(hWnd, &rc));
 
 	const uint32_t wndWidth = rc.right - rc.left, wndHeight = rc.bottom - rc.top;
-	uint32_t xMaxChars = wndWidth / CHAR_WIDTH, yMaxChars = wndHeight / CHAR_HEIGHT;
+	uint32_t xMaxChars = wndWidth / CharWidth, yMaxChars = wndHeight / CharHeight;
 	uint32_t xChars = static_cast<uint32_t>(text.size()), yChars = 1;
 	bool requireScale = false;
 
@@ -99,7 +99,7 @@ void UpdatePreview(HWND hWnd, std::wstring_view text, bool useGDIP)
 		}
 	} while (requireScale);
 
-	const uint32_t width = xChars * CHAR_WIDTH, height = yChars * CHAR_HEIGHT;
+	const uint32_t width = xChars * CharWidth, height = yChars * CharHeight;
 
 	auto hdcWnd = wil::GetDC(hWnd);
 	THROW_HR_IF(E_FAIL, !hdcWnd);
@@ -282,27 +282,27 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 				wil::unique_hdc hdc(CreateCompatibleDC(hdcWnd.get()));
 				THROW_HR_IF(E_FAIL, !hdc);
 				uint8_t* bmBits;
-				wil::unique_hbitmap hBitmap(CreateDIB(hdcWnd.get(), TEXTURE_WIDTH, TEXTURE_HEIGHT, 32, reinterpret_cast<void**>(&bmBits)));
+				wil::unique_hbitmap hBitmap(CreateDIB(hdcWnd.get(), TextureWidth, TextureHeight, 32, reinterpret_cast<void**>(&bmBits)));
 				THROW_HR_IF(E_FAIL, !hBitmap);
 				auto selectBitmap = wil::SelectObject(hdc.get(), hBitmap.get());
 
-				std::fill_n(bmBits, TEXTURE_WIDTH * TEXTURE_HEIGHT * 4, '\0');
+				std::fill_n(bmBits, TextureWidth * TextureHeight * 4, '\0');
 
 				if (useGDIP)
 				{
-					GpDrawCharacters(hdc.get(), chars, TEXTURE_XCHARS, TEXTURE_YCHARS);
+					GpDrawCharacters(hdc.get(), chars, TextureXChars, TextureYChars);
 				}
 				else
 				{
-					DWriteDrawCharacters(hdc.get(), TEXTURE_WIDTH, TEXTURE_HEIGHT, chars, TEXTURE_XCHARS, TEXTURE_YCHARS);
+					DWriteDrawCharacters(hdc.get(), TextureWidth, TextureHeight, chars, TextureXChars, TextureYChars);
 				}
 
 				DirectX::Image img = {
-					.width = TEXTURE_WIDTH,
-					.height = TEXTURE_HEIGHT,
+					.width = TextureWidth,
+					.height = TextureHeight,
 					.format = DXGI_FORMAT_B8G8R8A8_UNORM,
-					.rowPitch = TEXTURE_WIDTH * 4,
-					.slicePitch = TEXTURE_WIDTH * TEXTURE_HEIGHT * 4,
+					.rowPitch = TextureWidth * 4,
+					.slicePitch = TextureWidth * TextureHeight * 4,
 					.pixels = bmBits
 				};
 				THROW_IF_FAILED(DirectX::Compress(img, DXGI_FORMAT_BC3_UNORM, DirectX::TEX_COMPRESS_PARALLEL, DirectX::TEX_THRESHOLD_DEFAULT, dxt5Img));
@@ -318,10 +318,10 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 
 			auto texture = *dict->values.data.Get()->Get(); // copy
 			texture.name.Set("pack:/font_chs.dds");
-			texture.width = TEXTURE_WIDTH;
-			texture.height = TEXTURE_HEIGHT;
+			texture.width = TextureWidth;
+			texture.height = TextureHeight;
 			texture.pixelFormat = D3DFMT_DXT5;
-			texture.stride = TEXTURE_WIDTH;
+			texture.stride = TextureWidth;
 			texture.next = 0;
 			texture.prev = 0;
 			texture.pixelData.Set(dxt5Img.GetPixels());

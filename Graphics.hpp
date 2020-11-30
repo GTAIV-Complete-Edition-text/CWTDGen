@@ -68,10 +68,10 @@ void GDIDrawCheckeredBackground(HDC hdc, LONG width, LONG height, uint32_t xChar
 	{
 		for (uint32_t x = y % 2; x < xChars; x += 2)
 		{
-			fillRect.left = static_cast<LONG>(x * CHAR_WIDTH);
-			fillRect.top = static_cast<LONG>(y * CHAR_HEIGHT);
-			fillRect.right = fillRect.left + CHAR_WIDTH;
-			fillRect.bottom = fillRect.top + CHAR_HEIGHT;
+			fillRect.left = static_cast<LONG>(x * CharWidth);
+			fillRect.top = static_cast<LONG>(y * CharHeight);
+			fillRect.right = fillRect.left + CharWidth;
+			fillRect.bottom = fillRect.top + CharHeight;
 			FillRect(hdc, &fillRect, hBrush2.get());
 		}
 	}
@@ -121,7 +121,7 @@ void GDIDrawCharacters(HDC hdc, std::wstring_view text, uint32_t xChars, uint32_
 	{
 		for (uint32_t x = 0; x < xChars && i < text.size(); ++x, ++i)
 		{
-			bool isSymbol = SYMBOL_SET.contains(text[i]);
+			bool isSymbol = SymbolSet.contains(text[i]);
 			if (isSymbol != symbolFontSelected)
 			{
 				SelectObject(hdc, isSymbol ? hSymbolFont.get() : hFont.get());
@@ -129,10 +129,10 @@ void GDIDrawCharacters(HDC hdc, std::wstring_view text, uint32_t xChars, uint32_
 			}
 
 			RECT rect;
-			rect.left = static_cast<LONG>(x * CHAR_WIDTH);
-			rect.top = static_cast<LONG>(y * CHAR_HEIGHT);
-			rect.right = rect.left + CHAR_WIDTH;
-			rect.bottom = rect.top + CHAR_HEIGHT;
+			rect.left = static_cast<LONG>(x * CharWidth);
+			rect.top = static_cast<LONG>(y * CharHeight);
+			rect.right = rect.left + CharWidth;
+			rect.bottom = rect.top + CharHeight;
 
 			DrawTextW(hdc, &text[i], 1, &rect, DT_CENTER | DT_NOPREFIX | DT_SINGLELINE | DT_BOTTOM);
 		}
@@ -164,12 +164,12 @@ void GpDrawCharacters(HDC hdc, std::wstring_view text, uint32_t xChars, uint32_t
 	{
 		for (uint32_t x = 0; x < xChars && i < text.size(); ++x, ++i)
 		{
-			while (i < text.size() && IGNORE_SET.contains(text[i]))
+			while (i < text.size() && IgnoreSet.contains(text[i]))
 				++i;
 
-			bool isSymbol = SYMBOL_SET.contains(text[i]);
+			bool isSymbol = SymbolSet.contains(text[i]);
 
-			Gp::RectF rect(static_cast<Gp::REAL>(x * CHAR_WIDTH), static_cast<Gp::REAL>(y * CHAR_HEIGHT), CHAR_WIDTH, CHAR_HEIGHT);
+			Gp::RectF rect(static_cast<Gp::REAL>(x * CharWidth), static_cast<Gp::REAL>(y * CharHeight), CharWidth, CharHeight);
 			graphics.DrawString(&text[i], 1, isSymbol ? &symbolFont : &font, rect, &format, &brush);
 		}
 	}
@@ -195,16 +195,16 @@ void DWriteDrawCharacters(ID2D1RenderTarget* renderTarget, std::wstring_view tex
 	{
 		for (uint32_t x = 0; x < xChars && i < text.size(); ++x, ++i)
 		{
-			while (i < text.size() && IGNORE_SET.contains(text[i]))
+			while (i < text.size() && IgnoreSet.contains(text[i]))
 				++i;
 
-			bool isSymbol = SYMBOL_SET.contains(text[i]);
+			bool isSymbol = SymbolSet.contains(text[i]);
 
 			D2D1_RECT_F rect;
-			rect.left = static_cast<float>(x * CHAR_WIDTH);
-			rect.top = static_cast<float>(y * CHAR_HEIGHT);
-			rect.right = rect.left + CHAR_WIDTH;
-			rect.bottom = rect.top + CHAR_HEIGHT;
+			rect.left = static_cast<float>(x * CharWidth);
+			rect.top = static_cast<float>(y * CharHeight);
+			rect.right = rect.left + CharWidth;
+			rect.bottom = rect.top + CharHeight;
 
 			renderTarget->DrawText(&text[i], 1, isSymbol ? symbolTextFormat.get() : textFormat.get(), rect, brush.get());
 		}
