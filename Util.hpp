@@ -108,3 +108,15 @@ std::wstring ReadTextToUtf16String(HANDLE hFile)
 		return std::wstring(reinterpret_cast<const wchar_t*>(data.data() + 2), data.size() / 2 - 1);
 	return Utf8ToUtf16(std::string_view(reinterpret_cast<const char*>(data.data()), data.size())); // Treat data as UTF-8
 }
+
+uint32_t Log2(uint32_t x)
+{
+	unsigned long index;
+	if (!_BitScanReverse(&index, x)) return UINT32_MAX;
+	return index;
+}
+
+uint32_t Log2Ceil(uint32_t x)
+{
+	return Log2(x - 1) + 1;
+}

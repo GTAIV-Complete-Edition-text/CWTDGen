@@ -9,6 +9,79 @@
 
 namespace RageUtil
 {
+	static std::span<uint8_t> s_virtual;
+	static std::span<uint8_t> s_physical;
+	static std::vector<void*> s_ptrTable;
+
+	enum struct pgPtrBlockType : uint32_t
+	{
+		Virtual = 5,
+		Physical = 6,
+		Memory = 0xf // Hack
+	};
+
+	template<pgPtrBlockType DefaultBlockType>
+	struct pgPtr
+	{
+		uint32_t offset : 28;
+		pgPtrBlockType blockType : 4;
+
+		void SetOffset(uint32_t off, pgPtrBlockType type = DefaultBlockType)
+		{
+			offset = off;
+			blockType = type;
+		}
+
+		bool CheckType() const { return blockType == DefaultBlockType; }
+	};
+
+	template<typename T, pgPtrBlockType DefaultBlockType = pgPtrBlockType::Virtual>
+	struct pgPtrT : pgPtr<DefaultBlockType>
+	{
+		using pgPtr<DefaultBlockType>::offset;
+		using pgPtr<DefaultBlockType>::blockType;
+		using pgPtr<DefaultBlockType>::CheckType;
+
+		[[nodiscard]] T* Get() const
+		{
+			switch (blockType)
+			{
+			case pgPtrBlockType::Virtual:
+				THROW_HR_IF(E_INVALIDARG, !CheckType() || (offset + sizeof(T)) > s_virtual.size());
+				return reinterpret_cast<T*>(s_virtual.data() + offset);
+			case pgPtrBlockType::Physical:
+				THROW_HR_IF(E_INVALIDARG, !CheckType() || (offset + sizeof(T)) > s_physical.size());
+				return reinterpret_cast<T*>(s_physical.data() + offset);
+			case pgPtrBlockType::Memory:
+				return reinterpret_cast<T*>(s_ptrTable[static_cast<size_t>(offset)]);
+			}
+			THROW_HR(E_INVALIDARG); // Unknown blockType
+		}
+
+		[[nodiscard]] T* operator->() const
+		{
+			return Get();
+		}
+
+		void Set(const T* ptr)
+		{
+			auto voidPtr = reinterpret_cast<void*>(const_cast<T*>(ptr));
+			if (blockType == pgPtrBlockType::Memory)
+			{
+				s_ptrTable[static_cast<size_t>(offset)] = voidPtr;
+			}
+			else
+			{
+				auto index = s_ptrTable.size();
+				s_ptrTable.emplace_back(voidPtr);
+
+				offset = static_cast<uint32_t>(index);
+				blockType = pgPtrBlockType::Memory;
+			}
+		}
+	};
+	static_assert(sizeof(pgPtrT<int>) == 4);
+
 	namespace RSC5
 	{
 		enum struct ResourceType : uint32_t
@@ -23,6 +96,32 @@ namespace RageUtil
 			Texture = 0x8, // wtd
 			Model = 0x6E, // wdr
 			ModelFrag = 0x70, //wft
+		};
+
+		struct RSC5Flags
+		{
+#define DEF_BLOCK_FLAG(t) \
+	uint32_t t##Block0Count : 1; \
+	uint32_t t##Block1Count : 1; \
+	uint32_t t##Block2Count : 1; \
+	uint32_t t##Block3Count : 1; \
+	uint32_t t##Block4Count : 7; \
+	uint32_t t##BlockSize : 4;
+
+			DEF_BLOCK_FLAG(v); // virtual
+			DEF_BLOCK_FLAG(p); // physical
+
+#undef DEF_BLOCK_FLAG
+
+			uint32_t unk0 : 1;
+			uint32_t unk1 : 1;
+		};
+		static_assert(sizeof(RSC5Flags) == 4);
+
+		union RSC5FlagsUint32
+		{
+			RSC5Flags flags;
+			uint32_t uint32;
 		};
 
 		struct Header
@@ -42,76 +141,46 @@ namespace RageUtil
 			{
 				return ((flags >> 15) & 0x7FF) << (((flags >> 26) & 0xF) + 8);
 			}
-
-			static std::pair<uint32_t, uint32_t> CalculateFlag(uint32_t size)
-			{
-				constexpr uint32_t maxBase = 0x3F;
-
-				uint32_t base = size >> 8;
-				uint32_t shift = 0;
-
-				while (base > maxBase)
-				{
-					if (base & 1)
-					{
-						base += 2;
-					}
-					base >>= 1;
-					shift++;
-				}
-
-				// Pad non-even sizes
-				if (base & 1)
-				{
-					base++;
-				}
-
-				uint32_t roundUpSize = base << (shift + 8);
-				return { base | (shift << 11), roundUpSize };
-			}
-
-			static constexpr uint32_t MinVirtualSize = 4096;
-
-			auto SetFlagSizes(uint32_t virtualSize, uint32_t physicalSize)
-			{
-				const auto vSizes = CalculateFlag(std::max(virtualSize, MinVirtualSize));
-				const auto pSizes = CalculateFlag(physicalSize);
-				flags = (flags & 0xC0000000) | vSizes.first | (pSizes.first << 15);
-				return std::make_pair(vSizes.second, pSizes.second);
-			}
 		};
 		static_assert(sizeof(Header) == 12);
 
 		// For use to store our block data
 		struct BlockList
 		{
+			template<pgPtrBlockType BlockType>
 			struct BlockInfo
 			{
 				void* data;
 				uint32_t size;
-				uint32_t offset;
+				pgPtr<BlockType>* offsetPos;
 			};
 
-			uint32_t virtualSize = 0;
-			uint32_t physicalSize = 0;
+			using VBlockInfo = BlockInfo<pgPtrBlockType::Virtual>;
+			using PBlockInfo = BlockInfo<pgPtrBlockType::Physical>;
 
-			std::vector<BlockInfo> virtualBlocks;
-			std::vector<BlockInfo> physicalBlocks;
+			std::vector<VBlockInfo> virtualBlocks;
+			std::vector<PBlockInfo> physicalBlocks;
 
-			uint32_t AppendVirtual(void* data, uint32_t size)
+			void AppendVirtual(void* data, uint32_t size, pgPtr<pgPtrBlockType::Virtual>* offsetPos)
 			{
-				const uint32_t offset = virtualSize;
-				virtualBlocks.emplace_back(data, size, offset);
-				virtualSize += RoundUp<16>(size);
-				return offset;
+				virtualBlocks.emplace_back(data, size, offsetPos);
 			}
 
-			uint32_t AppendPhysical(void* data, uint32_t size)
+			template<typename T>
+			void AppendVirtualPtr(pgPtrT<T, pgPtrBlockType::Virtual>& ptr, uint32_t size = sizeof(T))
 			{
-				const uint32_t offset = physicalSize;
-				physicalBlocks.emplace_back(data, size, offset);
-				physicalSize += RoundUp<16>(size);
-				return offset;
+				AppendVirtual(ptr.Get(), size, &ptr);
+			}
+
+			void AppendPhysical(void* data, uint32_t size, pgPtr<pgPtrBlockType::Physical>* offsetPos)
+			{
+				physicalBlocks.emplace_back(data, size, offsetPos);
+			}
+
+			template<typename T>
+			void AppendPhysicalPtr(pgPtrT<T, pgPtrBlockType::Physical>& ptr, uint32_t size = sizeof(T))
+			{
+				AppendPhysical(ptr.Get(), size, &ptr);
 			}
 		};
 
@@ -152,9 +221,86 @@ namespace RageUtil
 
 		constexpr uint8_t PadByte = 0xcd;
 
-		auto DumpToFile(HANDLE hFile, Header& header, const BlockList& blockList)
+		uint32_t SortAndCalculateFlags(BlockList& blockList)
 		{
-			const auto [realVirtualSize, realPhysicalSize] = header.SetFlagSizes(blockList.virtualSize, blockList.physicalSize);
+			RSC5FlagsUint32 f;
+			f.uint32 = 0;
+
+			std::sort(blockList.virtualBlocks.begin() + 1, blockList.virtualBlocks.end(), [](const BlockList::VBlockInfo& l, const BlockList::VBlockInfo& r) {
+				return l.size > r.size;
+			});
+
+			uint32_t virtualSize = 0;
+			for (auto& b : blockList.virtualBlocks)
+			{
+				if (b.offsetPos)
+					b.offsetPos->SetOffset(virtualSize);
+				virtualSize += RoundUp<16>(b.size);
+			}
+
+			// Assume virtual size <= 4096 and allocate a single level 4 block
+			THROW_HR_IF(E_NOTIMPL, virtualSize > 4096);
+			f.flags.vBlock4Count = 1;
+
+			std::sort(blockList.physicalBlocks.begin(), blockList.physicalBlocks.end(), [](const BlockList::PBlockInfo& l, const BlockList::PBlockInfo& r) {
+				return l.size > r.size;
+			});
+
+			uint32_t physicalSize = 0;
+			for (auto& b : blockList.physicalBlocks)
+			{
+				b.offsetPos->SetOffset(physicalSize);
+				physicalSize += RoundUp<16>(b.size);
+			}
+
+			const uint32_t biggestBlockSize = blockList.physicalBlocks.front().size;
+			uint32_t phyBlockSize = Log2Ceil(biggestBlockSize);
+			if (phyBlockSize < 12)
+				phyBlockSize = 8;
+			else
+				phyBlockSize -= 4;
+
+			uint32_t currentPhyBlockRemain = (1 << 4 << phyBlockSize) - biggestBlockSize;
+			uint8_t levelsCount[5] = { 0, 0, 0, 0, 1 };
+			for (auto it = blockList.physicalBlocks.begin() + 1; it != blockList.physicalBlocks.end(); ++it)
+			{
+				if (currentPhyBlockRemain >= it->size)
+				{
+					currentPhyBlockRemain -= it->size;
+					continue;
+				}
+
+				const uint32_t currBlockSize = Log2Ceil(it->size);
+				uint32_t level = 0;
+				if (currBlockSize > phyBlockSize)
+					level = currBlockSize - phyBlockSize;
+
+				levelsCount[level]++;
+				currentPhyBlockRemain = (1 << level << phyBlockSize) - it->size;
+
+				for (size_t i = level; i < std::size(levelsCount) - 1; ++i)
+				{
+					if (levelsCount[level] > 1)
+					{
+						levelsCount[level] = 0;
+						levelsCount[level + 1]++;
+					}
+				}
+			}
+
+			f.flags.pBlock0Count = levelsCount[0];
+			f.flags.pBlock1Count = levelsCount[1];
+			f.flags.pBlock2Count = levelsCount[2];
+			f.flags.pBlock3Count = levelsCount[3];
+			f.flags.pBlock4Count = levelsCount[4];
+			f.flags.pBlockSize = phyBlockSize - 8;
+
+			return f.uint32;
+		}
+
+		auto DumpToFile(HANDLE hFile, Header& header, [[maybe_unused]] BlockList& blockList)
+		{
+			header.flags = (header.flags & 0xc0000000) | SortAndCalculateFlags(blockList);
 			WriteFileCheckSize(hFile, &header, sizeof(header));
 
 			unique_z_stream_deflate strm;
@@ -175,19 +321,21 @@ namespace RageUtil
 			};
 			auto WritePadBytes = [&DeflateWrite](size_t size) {
 				if (size == 0) return;
-				uint8_t buf[Header::MinVirtualSize];
+				uint8_t buf[4096];
 				std::fill_n(buf, std::min(size, std::size(buf)), PadByte);
 				DeflateWrite(buf, size);
 			};
 
+			uint32_t virtualSize = 0;
 			for (auto& b : blockList.virtualBlocks)
 			{
 				DeflateWrite(b.data, b.size);
 				auto padSize = RoundUp<16>(b.size) - b.size;
 				WritePadBytes(padSize);
+				virtualSize += RoundUp<16>(b.size);
 			}
 
-			WritePadBytes(realVirtualSize - blockList.virtualSize);
+			WritePadBytes(4096 - virtualSize);
 
 			for (auto& b : blockList.physicalBlocks)
 			{
@@ -200,75 +348,10 @@ namespace RageUtil
 		}
 	}
 
-	enum struct pgPtrBlockType : uint32_t
-	{
-		Virtual = 5,
-		Physical = 6,
-		Memory = 0xf // Hack
-	};
-
-	static std::span<uint8_t> s_virtual;
-	static std::span<uint8_t> s_physical;
-	static std::vector<void*> s_ptrTable;
-
-	template<typename T, pgPtrBlockType DefaultBlockType = pgPtrBlockType::Virtual>
-	struct pgPtr
-	{
-		uint32_t offset : 28;
-		pgPtrBlockType blockType : 4;
-
-		[[nodiscard]] T* Get() const
-		{
-			switch (blockType)
-			{
-			case pgPtrBlockType::Virtual:
-				THROW_HR_IF(E_INVALIDARG, !CheckType() || (offset + sizeof(T)) > s_virtual.size());
-				return reinterpret_cast<T*>(s_virtual.data() + offset);
-			case pgPtrBlockType::Physical:
-				THROW_HR_IF(E_INVALIDARG, !CheckType() || (offset + sizeof(T)) > s_physical.size());
-				return reinterpret_cast<T*>(s_physical.data() + offset);
-			case pgPtrBlockType::Memory:
-				return reinterpret_cast<T*>(s_ptrTable[static_cast<size_t>(offset)]);
-			}
-			THROW_HR(E_INVALIDARG); // Unknown blockType
-		}
-
-		[[nodiscard]] T* operator->() const
-		{
-			return Get();
-		}
-
-		void Set(const T* ptr)
-		{
-			auto voidPtr = reinterpret_cast<void*>(const_cast<T*>(ptr));
-			if (blockType == pgPtrBlockType::Memory)
-			{
-				s_ptrTable[static_cast<size_t>(offset)] = voidPtr;
-			}
-			else
-			{
-				auto index = s_ptrTable.size();
-				s_ptrTable.emplace_back(voidPtr);
-
-				offset = static_cast<uint32_t>(index);
-				blockType = pgPtrBlockType::Memory;
-			}
-		}
-
-		void SetOffset(uint32_t off, pgPtrBlockType type = DefaultBlockType)
-		{
-			offset = off;
-			blockType = type;
-		}
-
-		bool CheckType() const { return blockType == DefaultBlockType; }
-	};
-	static_assert(sizeof(pgPtr<int>) == 4);
-
 	template<typename T>
 	struct pgArray
 	{
-		pgPtr<T> data;
+		pgPtrT<T> data;
 		uint16_t size;
 		uint16_t capacity;
 
@@ -305,11 +388,42 @@ namespace RageUtil
 
 			return container;
 		}
+
+		void DumpToMemory(RSC5::BlockList& blockList)
+		{
+			blockList.AppendVirtualPtr(data, static_cast<uint32_t>(sizeof(T) * size));
+		}
 	};
 	static_assert(sizeof(pgArray<int>) == 8);
 
 	template<typename T>
-	using pgObjectArray = pgArray<pgPtr<T>>;
+	concept HasDumpToMemory = requires (T t, RSC5::BlockList b) {
+		t.DumpToMemory(b);
+	};
+
+	template<typename T>
+	struct pgObjectArray : pgArray<pgPtrT<T>>
+	{
+		using pgArray<pgPtrT<T>>::data;
+		using pgArray<pgPtrT<T>>::size;
+
+		void DumpToMemory(RSC5::BlockList& blockList)
+		{
+			pgArray<pgPtrT<T>>::DumpToMemory(blockList);
+
+			const auto objsPtr = data.Get();
+			for (uint_fast16_t i = 0; i < size; ++i)
+			{
+				const auto obj = objsPtr[i].Get();
+				blockList.AppendVirtual(obj, sizeof(T), &objsPtr[i]);
+
+				if constexpr (HasDumpToMemory<T>)
+				{
+					obj->DumpToMemory(blockList);
+				}
+			}
+		}
+	};
 	static_assert(sizeof(pgObjectArray<int>) == 8);
 
 	struct datBase
@@ -337,14 +451,19 @@ namespace RageUtil
 
 	struct pgBase : datBase
 	{
-		pgPtr<BlockMap> blockMap;
+		pgPtrT<BlockMap> blockMap;
+
+		void DumpToMemory(RSC5::BlockList& blockList)
+		{
+			blockList.AppendVirtualPtr(blockMap);
+		}
 	};
 	static_assert(sizeof(pgBase) == 8);
 
 	template<typename T>
 	struct pgDictionary : public pgBase
 	{
-		pgPtr<pgBase> parent;
+		pgPtrT<pgBase> parent;
 		uint32_t usageCount;
 		pgArray<uint32_t> hashes;
 		pgObjectArray<T> values;
@@ -352,7 +471,7 @@ namespace RageUtil
 		[[nodiscard]] auto Insert(uint32_t hash, T* value)
 		{
 			auto [hashContainer, pos] = hashes.InsertSorted(hash);
-			pgPtr<T> ptr;
+			pgPtrT<T> ptr;
 			ptr.Set(value);
 			auto valueContainer = values.InsertAt(pos, ptr);
 			return std::make_pair(std::move(hashContainer), std::move(valueContainer));
@@ -360,34 +479,9 @@ namespace RageUtil
 
 		void DumpToMemory(RSC5::BlockList& blockList)
 		{
-			blockList.AppendVirtual(this, sizeof(pgDictionary));
-			
-			auto offset = blockList.AppendVirtual(blockMap.Get(), sizeof(BlockMap));
-			blockMap.SetOffset(offset);
-
-			const auto size = static_cast<size_t>(values.size);
-			const auto objects = std::make_unique<T*[]>(size);
-
-			const auto objsPtr = values.data.Get();
-			for (size_t i = 0; i < size; ++i)
-			{
-				const auto object = objsPtr[i].Get();
-				offset = blockList.AppendVirtual(object, sizeof(T));
-				objsPtr[i].SetOffset(offset);
-				objects.get()[i] = object;
-			}
-
-			for (size_t i = 0; i < size; ++i)
-			{
-				objects.get()[i]->DumpToMemory(blockList);
-			}
-
-			assert(size == hashes.size);
-			offset = blockList.AppendVirtual(hashes.data.Get(), static_cast<uint32_t>(sizeof(uint32_t) * size));
-			hashes.data.SetOffset(offset);
-
-			offset = blockList.AppendVirtual(objsPtr, static_cast<uint32_t>(sizeof(pgPtr<T>) * size));
-			values.data.SetOffset(offset);
+			pgBase::DumpToMemory(blockList);
+			hashes.DumpToMemory(blockList);
+			values.DumpToMemory(blockList);
 		}
 	};
 	static_assert(sizeof(pgDictionary<int>) == 32);
@@ -399,7 +493,7 @@ namespace RageUtil
 		uint16_t usageCount;
 		uint32_t pad;
 		uint32_t pad2;
-		pgPtr<char> name;
+		pgPtrT<char> name;
 		uint32_t nativeHandle;
 		uint16_t width;
 		uint16_t height;
@@ -407,6 +501,12 @@ namespace RageUtil
 		uint16_t stride;
 		uint8_t textureType;
 		uint8_t levels;
+
+		void DumpToMemory(RSC5::BlockList& blockList)
+		{
+			const auto namePtr = name.Get();
+			blockList.AppendVirtual(namePtr, static_cast<uint32_t>(strlen(namePtr) + 1), &name);
+		}
 	};
 
 	struct grcTexturePC : grcTexture
@@ -415,14 +515,14 @@ namespace RageUtil
 		float unk34[3];
 		uint32_t next;
 		uint32_t prev;
-		pgPtr<uint8_t, pgPtrBlockType::Physical> pixelData; // In physical data segment
+		pgPtrT<uint8_t, pgPtrBlockType::Physical> pixelData; // In physical data segment
 		uint8_t pad[4];
 
 		void DumpToMemory(RSC5::BlockList& blockList)
 		{
-			const auto namePtr = name.Get();
-			auto offset = blockList.AppendVirtual(namePtr, static_cast<uint32_t>(strlen(namePtr) + 1));
-			name.SetOffset(offset);
+			grcTexture::DumpToMemory(blockList);
+
+			THROW_HR_IF(E_NOTIMPL, levels > 1);
 
 			DXGI_FORMAT fmt = DXGI_FORMAT_UNKNOWN;
 			switch (pixelFormat)
@@ -442,8 +542,7 @@ namespace RageUtil
 
 			size_t rowPitch, slicePitch;
 			THROW_IF_FAILED(DirectX::ComputePitch(fmt, width, height, rowPitch, slicePitch));
-			offset = blockList.AppendPhysical(pixelData.Get(), static_cast<uint32_t>(slicePitch));
-			pixelData.SetOffset(offset);
+			blockList.AppendPhysicalPtr(pixelData, static_cast<uint32_t>(slicePitch));
 		}
 	};
 	static_assert(sizeof(grcTexturePC) == 80);

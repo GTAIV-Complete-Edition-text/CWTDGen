@@ -329,15 +329,16 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 
 			auto containers = dict->Insert(RageUtil::HashString("font_chs"), &texture);
 
-			RageUtil::RSC5::BlockList bm;
-			dict->DumpToMemory(bm);
+			RageUtil::RSC5::BlockList blockList;
+			blockList.AppendVirtual(dict, sizeof(*dict), nullptr);
+			dict->DumpToMemory(blockList);
+
+			hFile.reset(CreateFileW(L"fonts_chs.wtd", GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+			RageUtil::RSC5::DumpToFile(hFile.get(), header, blockList);
 
 			RageUtil::s_virtual = {};
 			RageUtil::s_physical = {};
 			RageUtil::s_ptrTable.clear();
-
-			hFile.reset(CreateFileW(L"fonts_chs.wtd", GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
-			RageUtil::RSC5::DumpToFile(hFile.get(), header, bm);
 		}
 		break;
 		}
