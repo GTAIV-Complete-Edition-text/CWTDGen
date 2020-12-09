@@ -522,8 +522,6 @@ namespace RageUtil
 		{
 			grcTexture::DumpToMemory(blockList);
 
-			THROW_HR_IF(E_NOTIMPL, levels > 1);
-
 			DXGI_FORMAT fmt = DXGI_FORMAT_UNKNOWN;
 			switch (pixelFormat)
 			{
@@ -540,9 +538,24 @@ namespace RageUtil
 			}
 			THROW_HR_IF(HRESULT_FROM_WIN32(ERROR_INVALID_PIXEL_FORMAT), fmt == DXGI_FORMAT_UNKNOWN);
 
-			size_t rowPitch, slicePitch;
-			THROW_IF_FAILED(DirectX::ComputePitch(fmt, width, height, rowPitch, slicePitch));
-			blockList.AppendPhysicalPtr(pixelData, static_cast<uint32_t>(slicePitch));
+			size_t pixelSize = 0;
+			size_t w = width;
+			size_t h = height;
+			for (size_t level = 0; level < levels; ++level)
+			{
+				size_t rowPitch, slicePitch;
+				THROW_IF_FAILED(DirectX::ComputePitch(fmt, w, h, rowPitch, slicePitch));
+
+				pixelSize += slicePitch;
+
+				if (h > 1)
+					h >>= 1;
+
+				if (w > 1)
+					w >>= 1;
+			}
+
+			blockList.AppendPhysicalPtr(pixelData, static_cast<uint32_t>(pixelSize));
 		}
 	};
 	static_assert(sizeof(grcTexturePC) == 80);
