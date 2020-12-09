@@ -15,6 +15,13 @@ static const std::unordered_set<wchar_t> SymbolSet = { L'—', L'　', L'、', L
 static const std::unordered_set<wchar_t> IgnoreSet = { L'\n', L'\r' };
 static const std::unordered_map<wchar_t, wchar_t> ReplaceMap = { {L'「', L'“'}, {L'」', L'”'}, {L'『', L'‘'}, {L'』', L'’'} };
 
+constexpr auto FontsPathIV = LR"(pc\textures\fonts.wtd)";
+constexpr auto FontsPathTBoGT = LR"(TBoGT\pc\textures\fonts.wtd)";
+constexpr auto FontsPathTLAD = LR"(TLAD\pc\textures\fonts.wtd)";
+constexpr auto NewFontsPathIV = LR"(CHS\fonts.wtd)";
+constexpr auto NewFontsPathTBoGT = LR"(TBoGT\CHS\fonts.wtd)";
+constexpr auto NewFontsPathTLAD = LR"(TLAD\CHS\fonts.wtd)";
+
 HINSTANCE g_hInst;
 fs::path g_exePath;
 wil::com_ptr<ID2D1Factory> g_d2dFactory;

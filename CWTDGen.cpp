@@ -29,6 +29,7 @@ std::optional<LOGFONTW> ChooseFontDialog(HWND hWndOwner, int fontPointSize)
 {
 	LOGFONTW lf = {
 		.lfHeight = fontPointSize,
+		.lfWeight = FW_BOLD,
 		.lfCharSet = GB2312_CHARSET
 	};
 	CHOOSEFONTW cf = {
@@ -44,10 +45,10 @@ std::optional<LOGFONTW> ChooseFontDialog(HWND hWndOwner, int fontPointSize)
 
 bool CheckGTAIVFiles(const fs::path& path)
 {
-	static const fs::path list[] = {
-		LR"(pc\textures\fonts.wtd)",
-		LR"(TBoGT\pc\textures\fonts.wtd)",
-		LR"(TLAD\pc\textures\fonts.wtd)"
+	constexpr const wchar_t* list[] = {
+		FontsPathIV,
+		FontsPathTBoGT,
+		FontsPathTLAD
 	};
 	for (const auto& p : list)
 	{
@@ -63,6 +64,26 @@ bool CheckAndFixGTAIVPath(fs::path& path)
 	{
 		path /= L"GTAIV";
 		return CheckGTAIVFiles(path);
+	}
+	return true;
+}
+
+bool CheckFontSelected(HWND hWnd)
+{
+	if (!g_font.lfFaceName[0] || !g_symbolFont.lfFaceName[0])
+	{
+		TaskDialog(hWnd, nullptr, L"CWTDGen", nullptr, L"尚未选择字体", TDCBF_OK_BUTTON, TD_WARNING_ICON, nullptr);
+		return false;
+	}
+	return true;
+}
+
+bool CheckGamePathSelected(HWND hWnd)
+{
+	if (g_gamePath.empty())
+	{
+		TaskDialog(hWnd, nullptr, L"CWTDGen", nullptr, L"尚未选择游戏目录", TDCBF_OK_BUTTON, TD_WARNING_ICON, nullptr);
+		return false;
 	}
 	return true;
 }
@@ -147,6 +168,87 @@ void UpdatePreview(HWND hWnd, std::wstring_view text, bool useGDIP, bool replace
 	}
 
 	wil::unique_hbitmap hOldBitmap(reinterpret_cast<HBITMAP>(SendMessageW(hWnd, STM_SETIMAGE, IMAGE_BITMAP, reinterpret_cast<LPARAM>(hFinalBitmap))));
+}
+
+auto GenerateCharsImage(HWND hWnd, std::wstring_view chars, bool useGDIP, bool replaceChars)
+{
+	auto hdcWnd = wil::GetDC(hWnd);
+	THROW_HR_IF(E_FAIL, !hdcWnd);
+	wil::unique_hdc hdc(CreateCompatibleDC(hdcWnd.get()));
+	THROW_HR_IF(E_FAIL, !hdc);
+	uint8_t* bmBits;
+	wil::unique_hbitmap hBitmap(CreateDIB(hdcWnd.get(), TextureWidth, TextureHeight, 32, reinterpret_cast<void**>(&bmBits)));
+	THROW_HR_IF(E_FAIL, !hBitmap);
+	auto selectBitmap = wil::SelectObject(hdc.get(), hBitmap.get());
+
+	std::fill_n(bmBits, TextureWidth * TextureHeight * 4, '\0');
+
+	if (useGDIP)
+	{
+		GpDrawCharacters(hdc.get(), chars, TextureXChars, TextureYChars, replaceChars);
+	}
+	else
+	{
+		DWriteDrawCharacters(hdc.get(), TextureWidth, TextureHeight, chars, TextureXChars, TextureYChars, replaceChars);
+	}
+
+	DirectX::ScratchImage dxt5Img;
+
+	DirectX::Image img = {
+		.width = TextureWidth,
+		.height = TextureHeight,
+		.format = DXGI_FORMAT_B8G8R8A8_UNORM,
+		.rowPitch = TextureWidth * 4,
+		.slicePitch = TextureWidth * TextureHeight * 4,
+		.pixels = bmBits
+	};
+	THROW_IF_FAILED(DirectX::Compress(img, DXGI_FORMAT_BC3_UNORM, DirectX::TEX_COMPRESS_PARALLEL, DirectX::TEX_THRESHOLD_DEFAULT, dxt5Img));
+
+	return dxt5Img;
+}
+
+void CreateWTD(const fs::path& in, const fs::path& out, const DirectX::ScratchImage& dxt5Img)
+{
+	wil::unique_hfile hFile(CreateFileW(in.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+	THROW_LAST_ERROR_IF(!hFile);
+
+	auto [header, data] = RageUtil::RSC5::ReadFromFile(hFile.get());
+	RageUtil::s_virtual = { data.get(), header.GetVirtualSize() };
+	RageUtil::s_physical = { data.get() + RageUtil::s_virtual.size(), header.GetPhysicalSize() };
+
+	auto dict = reinterpret_cast<RageUtil::pgDictionary<RageUtil::grcTexturePC>*>(data.get());
+
+	auto hash = RageUtil::HashString("font_chs");
+
+	auto begin = dict->hashes.data.Get();
+	auto end = begin + dict->hashes.size;
+	if (std::find(begin, end, hash) != end)
+		THROW_HR(E_INVALIDARG);
+
+	auto texture = *dict->values.data.Get()->Get(); // copy
+	texture.name.Set("pack:/font_chs.dds");
+	texture.width = TextureWidth;
+	texture.height = TextureHeight;
+	texture.pixelFormat = D3DFMT_DXT5;
+	texture.stride = TextureWidth;
+	texture.next = 0;
+	texture.prev = 0;
+	texture.pixelData.Set(dxt5Img.GetPixels());
+
+	auto containers = dict->Insert(hash, &texture);
+
+	RageUtil::RSC5::BlockList blockList;
+	blockList.AppendVirtual(dict, sizeof(*dict), nullptr);
+	dict->DumpToMemory(blockList);
+
+	hFile.reset(CreateFileW(out.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+	THROW_LAST_ERROR_IF(!hFile);
+
+	RageUtil::RSC5::DumpToFile(hFile.get(), header, blockList);
+
+	RageUtil::s_virtual = {};
+	RageUtil::s_physical = {};
+	RageUtil::s_ptrTable.clear();
 }
 
 INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unused]] LPARAM lParam)
@@ -258,87 +360,77 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 					g_gamePath = std::move(path);
 					SetDlgItemTextW(hDlg, IDC_GAMEDIR, g_gamePath.c_str());
 				}
+				else
+					TaskDialog(hDlg, nullptr, L"CWTDGen", nullptr, L"选择的目录下未找到贴图文件", TDCBF_OK_BUTTON, TD_WARNING_ICON, nullptr);
 			}
 			CATCH_LOG();
 		}
 		break;
 		case IDC_GENERATE_PREVIEW:
-			UpdatePreview(s_hPreview, GetWindowString(GetDlgItem(hDlg, IDC_PREVIEW_TEXT)), IsDlgButtonChecked(hDlg, IDC_GDIP) == BST_CHECKED, IsDlgButtonChecked(hDlg, IDC_QUOTE_EN) == BST_CHECKED);
+			if (CheckFontSelected(hDlg))
+			{
+				try
+				{
+					UpdatePreview(s_hPreview, GetWindowString(GetDlgItem(hDlg, IDC_PREVIEW_TEXT)), IsDlgButtonChecked(hDlg, IDC_GDIP) == BST_CHECKED, IsDlgButtonChecked(hDlg, IDC_QUOTE_EN) == BST_CHECKED);
+				}
+				catch (...)
+				{
+					LOG_CAUGHT_EXCEPTION();
+					TaskDialog(hDlg, nullptr, L"CWTDGen", nullptr, L"生成预览时出现错误", TDCBF_OK_BUTTON, TD_ERROR_ICON, nullptr);
+				}
+			}
 			break;
 		case IDC_GENERATE:
 		{
-			std::wstring chars;
+			if (CheckFontSelected(hDlg) && CheckGamePathSelected(hDlg))
 			{
-				wil::unique_hfile hCharsFile(CreateFileW(L"characters.txt", GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
-				chars = ReadTextToUtf16String(hCharsFile.get());
-			}
-
-			bool useGDIP = IsDlgButtonChecked(hDlg, IDC_GDIP) == BST_CHECKED;
-			bool replaceChars = IsDlgButtonChecked(hDlg, IDC_QUOTE_EN) == BST_CHECKED;
-
-			DirectX::ScratchImage dxt5Img;
-			{
-				auto hdcWnd = wil::GetDC(hDlg);
-				THROW_HR_IF(E_FAIL, !hdcWnd);
-				wil::unique_hdc hdc(CreateCompatibleDC(hdcWnd.get()));
-				THROW_HR_IF(E_FAIL, !hdc);
-				uint8_t* bmBits;
-				wil::unique_hbitmap hBitmap(CreateDIB(hdcWnd.get(), TextureWidth, TextureHeight, 32, reinterpret_cast<void**>(&bmBits)));
-				THROW_HR_IF(E_FAIL, !hBitmap);
-				auto selectBitmap = wil::SelectObject(hdc.get(), hBitmap.get());
-
-				std::fill_n(bmBits, TextureWidth * TextureHeight * 4, '\0');
-
-				if (useGDIP)
+				try
 				{
-					GpDrawCharacters(hdc.get(), chars, TextureXChars, TextureYChars, replaceChars);
+					bool IV = IsDlgButtonChecked(hDlg, IDC_GAME_IV) == BST_CHECKED;
+					bool TLAD = IsDlgButtonChecked(hDlg, IDC_GAME_TLAD) == BST_CHECKED;
+					bool TBOGT = IsDlgButtonChecked(hDlg, IDC_GAME_TBOGT) == BST_CHECKED;
+
+					if (!(IV || TLAD || TBOGT))
+						break;
+
+					std::wstring chars;
+					{
+						wil::unique_hfile hCharsFile(CreateFileW(L"characters.txt", GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+						chars = ReadTextToUtf16String(hCharsFile.get());
+					}
+
+					bool useGDIP = IsDlgButtonChecked(hDlg, IDC_GDIP) == BST_CHECKED;
+					bool replaceChars = IsDlgButtonChecked(hDlg, IDC_QUOTE_EN) == BST_CHECKED;
+
+					auto dxt5Img = GenerateCharsImage(hDlg, chars, useGDIP, replaceChars);
+
+					if (IV)
+					{
+						auto path = g_gamePath / NewFontsPathIV;
+						fs::create_directories(path.parent_path());
+						CreateWTD(g_gamePath / FontsPathIV, path, dxt5Img);
+					}
+
+					if (TBOGT)
+					{
+						auto path = g_gamePath / NewFontsPathTBoGT;
+						fs::create_directories(path.parent_path());
+						CreateWTD(g_gamePath / FontsPathTBoGT, path, dxt5Img);
+					}
+
+					if (TLAD)
+					{
+						auto path = g_gamePath / NewFontsPathTLAD;
+						fs::create_directories(path.parent_path());
+						CreateWTD(g_gamePath / FontsPathTLAD, path, dxt5Img);
+					}
 				}
-				else
+				catch (...)
 				{
-					DWriteDrawCharacters(hdc.get(), TextureWidth, TextureHeight, chars, TextureXChars, TextureYChars, replaceChars);
+					LOG_CAUGHT_EXCEPTION();
+					TaskDialog(hDlg, nullptr, L"CWTDGen", nullptr, L"生成贴图时出现错误", TDCBF_OK_BUTTON, TD_ERROR_ICON, nullptr);
 				}
-
-				DirectX::Image img = {
-					.width = TextureWidth,
-					.height = TextureHeight,
-					.format = DXGI_FORMAT_B8G8R8A8_UNORM,
-					.rowPitch = TextureWidth * 4,
-					.slicePitch = TextureWidth * TextureHeight * 4,
-					.pixels = bmBits
-				};
-				THROW_IF_FAILED(DirectX::Compress(img, DXGI_FORMAT_BC3_UNORM, DirectX::TEX_COMPRESS_PARALLEL, DirectX::TEX_THRESHOLD_DEFAULT, dxt5Img));
 			}
-
-			wil::unique_hfile hFile(CreateFileW(L"fonts.wtd", GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
-
-			auto [header, data] = RageUtil::RSC5::ReadFromFile(hFile.get());
-			RageUtil::s_virtual = { data.get(), header.GetVirtualSize() };
-			RageUtil::s_physical = { data.get() + RageUtil::s_virtual.size(), header.GetPhysicalSize() };
-
-			auto dict = reinterpret_cast<RageUtil::pgDictionary<RageUtil::grcTexturePC>*>(data.get());
-
-			auto texture = *dict->values.data.Get()->Get(); // copy
-			texture.name.Set("pack:/font_chs.dds");
-			texture.width = TextureWidth;
-			texture.height = TextureHeight;
-			texture.pixelFormat = D3DFMT_DXT5;
-			texture.stride = TextureWidth;
-			texture.next = 0;
-			texture.prev = 0;
-			texture.pixelData.Set(dxt5Img.GetPixels());
-
-			auto containers = dict->Insert(RageUtil::HashString("font_chs"), &texture);
-
-			RageUtil::RSC5::BlockList blockList;
-			blockList.AppendVirtual(dict, sizeof(*dict), nullptr);
-			dict->DumpToMemory(blockList);
-
-			hFile.reset(CreateFileW(L"fonts_chs.wtd", GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
-			RageUtil::RSC5::DumpToFile(hFile.get(), header, blockList);
-
-			RageUtil::s_virtual = {};
-			RageUtil::s_physical = {};
-			RageUtil::s_ptrTable.clear();
 		}
 		break;
 		}
