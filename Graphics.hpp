@@ -192,8 +192,8 @@ void DWriteDrawCharacters(ID2D1RenderTarget* renderTarget, std::wstring_view tex
 
 	wil::com_ptr<IDWriteTextFormat> symbolTextFormat;
 	THROW_IF_FAILED(g_dwriteFactory->CreateTextFormat(g_symbolFont.lfFaceName, nullptr, static_cast<DWRITE_FONT_WEIGHT>(g_symbolFont.lfWeight), DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, fontSize, L"", &symbolTextFormat));
-	THROW_IF_FAILED(textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER));
-	THROW_IF_FAILED(textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_FAR));
+	THROW_IF_FAILED(symbolTextFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER));
+	THROW_IF_FAILED(symbolTextFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_FAR));
 
 	wil::com_ptr<ID2D1SolidColorBrush> brush;
 	THROW_IF_FAILED(renderTarget->CreateSolidColorBrush(D2D1::ColorF(0xffffff), &brush));
