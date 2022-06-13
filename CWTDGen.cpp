@@ -192,6 +192,12 @@ auto GenerateCharsImage(HWND hWnd, std::wstring_view chars, bool useGDIP, bool r
 		DWriteDrawCharacters(hdc.get(), TextureWidth, TextureHeight, chars, TextureXChars, TextureYChars, replaceChars);
 	}
 
+#if 0
+	// image/png {557cf406-1a04-11d3-9a73-0000f81ef32e}
+	static const CLSID pngEncoderClsId = { 0x557cf406, 0x1a04, 0x11d3, { 0x9a, 0x73, 0x00, 0x00, 0xf8, 0x1e, 0xf3, 0x2e } };
+	Gp::Bitmap(TextureWidth, TextureHeight, TextureWidth * 4, PixelFormat32bppPARGB, bmBits).Save(L"font_chs.png", &pngEncoderClsId);
+#endif
+
 	DirectX::ScratchImage dxt5Img;
 
 	DirectX::Image img = {
