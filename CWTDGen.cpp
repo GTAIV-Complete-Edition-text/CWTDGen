@@ -299,10 +299,10 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 		case IDC_SELECT_FONT:
 		case IDC_SELECT_SYMBOL_FONT:
 		{
-			auto font = ChooseFontDialog(hDlg, 64);
+			auto font = ChooseFontDialog(hDlg, -58);
 			if (font.has_value())
 			{
-				font->lfHeight = -64;
+				font->lfHeight = -58;
 				font->lfQuality = DEFAULT_QUALITY;
 				switch (wmId)
 				{

@@ -183,7 +183,7 @@ void GpDrawCharacters(HDC hdc, std::wstring_view text, uint32_t xChars, uint32_t
 	}
 }
 
-void DWriteDrawCharacters(ID2D1RenderTarget* renderTarget, std::wstring_view text, uint32_t xChars, uint32_t yChars, bool replaceChars, float fontSize = 64.0f)
+void DWriteDrawCharacters(ID2D1RenderTarget* renderTarget, std::wstring_view text, uint32_t xChars, uint32_t yChars, bool replaceChars, float fontSize = 58.0f)
 {
 	wil::com_ptr<IDWriteTextFormat> textFormat;
 	THROW_IF_FAILED(g_dwriteFactory->CreateTextFormat(g_font.lfFaceName, nullptr, static_cast<DWRITE_FONT_WEIGHT>(g_font.lfWeight), DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, fontSize, L"", &textFormat));
@@ -226,7 +226,7 @@ void DWriteDrawCharacters(ID2D1RenderTarget* renderTarget, std::wstring_view tex
 	}
 }
 
-void DWriteDrawCharacters(HDC hdc, LONG width, LONG height, std::wstring_view text, uint32_t xChars, uint32_t yChars, bool replaceChars, float fontSize = 64.0f)
+void DWriteDrawCharacters(HDC hdc, LONG width, LONG height, std::wstring_view text, uint32_t xChars, uint32_t yChars, bool replaceChars, float fontSize = 58.0f)
 {
 	wil::com_ptr<ID2D1DCRenderTarget> dcRenderTarget;
 	D2D1_RENDER_TARGET_PROPERTIES props = {
