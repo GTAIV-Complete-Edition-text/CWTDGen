@@ -257,6 +257,7 @@ void CreateWTD(const fs::path& in, const fs::path& out, const DirectX::ScratchIm
 	blockList.AppendVirtual(dict, sizeof(*dict), nullptr);
 	dict->DumpToMemory(blockList);
 
+	hFile.reset();
 	hFile.reset(CreateFileW(out.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
 	THROW_LAST_ERROR_IF(!hFile);
 
