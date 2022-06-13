@@ -332,7 +332,7 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 				}
 
 				size = static_cast<DWORD>(buf.size() * sizeof(wchar_t));
-				if (LOG_IF_WIN32_ERROR(RegGetValueW(HKEY_LOCAL_MACHINE, LR"(Software\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 12210)", L"InstallLocation", RRF_RT_REG_SZ, nullptr, buf.data(), &size)) == ERROR_SUCCESS)
+				if (LOG_IF_WIN32_ERROR(RegGetValueW(HKEY_LOCAL_MACHINE, LR"(Software\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 12210)", L"InstallLocation", RRF_RT_REG_SZ | RRF_SUBKEY_WOW6464KEY, nullptr, buf.data(), &size)) == ERROR_SUCCESS)
 				{
 					buf.resize(size / 2 - 1);
 					break;
