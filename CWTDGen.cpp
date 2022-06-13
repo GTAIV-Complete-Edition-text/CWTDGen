@@ -433,6 +433,12 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 			}
 		}
 		break;
+		case IDC_FONT:
+		case IDC_SYMBOL_FONT:
+		case IDC_GAMEDIR:
+			if (HIWORD(wParam) == EN_SETFOCUS)
+				HideCaret(reinterpret_cast<HWND>(lParam));
+			break;
 		}
 		break;
 	case WM_NOTIFY:
