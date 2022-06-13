@@ -109,6 +109,33 @@ std::wstring ReadTextToUtf16String(HANDLE hFile)
 	return Utf8ToUtf16(std::string_view(reinterpret_cast<const char*>(data.data()), data.size())); // Treat data as UTF-8
 }
 
+std::wstring ReadCharTableDatToUtf16String(HANDLE hFile)
+{
+	DWORD size = GetFileSize(hFile, nullptr);
+	THROW_LAST_ERROR_IF(size == INVALID_FILE_SIZE);
+
+	uint32_t count = 0;
+	ReadFileCheckSize(hFile, &count, sizeof(count));
+
+	const DWORD strSize = count * sizeof(uint32_t);
+	THROW_HR_IF(E_INVALIDARG, sizeof(count) + strSize != size);
+
+	auto u32str = std::make_unique<uint32_t[]>(count);
+	ReadFileCheckSize(hFile, u32str.get(), strSize);
+
+	std::wstring result;
+	result.reserve(count);
+
+	for (size_t i = 0; i < count; ++i)
+	{
+		const auto u32char = u32str[i];
+		THROW_HR_IF(E_NOTIMPL, u32char > UINT16_MAX);
+		result.push_back(static_cast<wchar_t>(u32char));
+	}
+
+	return result;
+}
+
 uint32_t Log2(uint32_t x)
 {
 	unsigned long index;

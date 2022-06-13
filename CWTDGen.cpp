@@ -88,6 +88,16 @@ bool CheckGamePathSelected(HWND hWnd)
 	return true;
 }
 
+bool CheckCharTableDat(HWND hWnd)
+{
+	if (!fs::is_regular_file(g_gamePath / CharTableDatPath))
+	{
+		TaskDialog(hWnd, nullptr, L"CWTDGen", nullptr, L"游戏目录下找不到 char_table.dat，请确认已正确安装汉化补丁", TDCBF_OK_BUTTON, TD_WARNING_ICON, nullptr);
+		return false;
+	}
+	return true;
+}
+
 void UpdatePreview(HWND hWnd, std::wstring_view text, bool useGDIP, bool replaceChars)
 {
 	if (text.empty())
@@ -331,14 +341,21 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 				buf.clear();
 			} while (0);
 
+			bool found = false;
 			if (!buf.empty())
 			{
 				fs::path path(std::move(buf));
 				if (CheckAndFixGTAIVPath(path))
 				{
 					g_gamePath = std::move(path);
+					found = true;
 					SetDlgItemTextW(hDlg, IDC_GAMEDIR, g_gamePath.c_str());
 				}
+			}
+
+			if (!found)
+			{
+				TaskDialog(hDlg, nullptr, L"CWTDGen", nullptr, L"无法找到游戏目录，请手动选择", TDCBF_OK_BUTTON, TD_WARNING_ICON, nullptr);
 			}
 		}
 		break;
@@ -388,7 +405,7 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 			break;
 		case IDC_GENERATE:
 		{
-			if (CheckFontSelected(hDlg) && CheckGamePathSelected(hDlg))
+			if (CheckFontSelected(hDlg) && CheckGamePathSelected(hDlg) && CheckCharTableDat(hDlg))
 			{
 				try
 				{
@@ -401,8 +418,8 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 
 					std::wstring chars;
 					{
-						wil::unique_hfile hCharsFile(CreateFileW(L"characters.txt", GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
-						chars = ReadTextToUtf16String(hCharsFile.get());
+						wil::unique_hfile hCharsFile(CreateFileW((g_gamePath / CharTableDatPath).c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+						chars = ReadCharTableDatToUtf16String(hCharsFile.get());
 					}
 
 					bool useGDIP = IsDlgButtonChecked(hDlg, IDC_GDIP) == BST_CHECKED;
@@ -434,7 +451,7 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 				catch (...)
 				{
 					LOG_CAUGHT_EXCEPTION();
-					TaskDialog(hDlg, nullptr, L"CWTDGen", nullptr, L"生成贴图时出现错误", TDCBF_OK_BUTTON, TD_ERROR_ICON, nullptr);
+					TaskDialog(hDlg, nullptr, L"CWTDGen", nullptr, L"生成贴图时出现错误。\n如果已经替换汉化贴图，请尝试还原原版贴图。", TDCBF_OK_BUTTON, TD_ERROR_ICON, nullptr);
 				}
 			}
 		}

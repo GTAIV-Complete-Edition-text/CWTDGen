@@ -8,7 +8,7 @@ namespace Gp = Gdiplus;
 constexpr uint32_t TextureWidth = 4096;
 constexpr uint32_t TextureHeight = 4096;
 constexpr uint32_t CharWidth = 64;
-constexpr uint32_t CharHeight = 80;
+constexpr uint32_t CharHeight = 66;
 constexpr uint32_t TextureXChars = TextureWidth / CharWidth;
 constexpr uint32_t TextureYChars = TextureHeight / CharHeight;
 static const std::unordered_set<wchar_t> SymbolSet = { L'—', L'　', L'、', L'。', L'《', L'》', L'「', L'」', L'『', L'』', L'！', L'，', L'－', L'．', L'：', L'；', L'？', L'～' };
@@ -18,9 +18,10 @@ static const std::unordered_map<wchar_t, wchar_t> ReplaceMap = { {L'「', L'“'
 constexpr auto FontsPathIV = LR"(pc\textures\fonts.wtd)";
 constexpr auto FontsPathTBoGT = LR"(TBoGT\pc\textures\fonts.wtd)";
 constexpr auto FontsPathTLAD = LR"(TLAD\pc\textures\fonts.wtd)";
-constexpr auto NewFontsPathIV = LR"(CHS\fonts.wtd)";
-constexpr auto NewFontsPathTBoGT = LR"(TBoGT\CHS\fonts.wtd)";
-constexpr auto NewFontsPathTLAD = LR"(TLAD\CHS\fonts.wtd)";
+constexpr auto NewFontsPathIV = FontsPathIV;
+constexpr auto NewFontsPathTBoGT = FontsPathTBoGT;
+constexpr auto NewFontsPathTLAD = FontsPathTLAD;
+constexpr auto CharTableDatPath = LR"(plugins\GTA4.CHS\char_table.dat)";
 
 HINSTANCE g_hInst;
 fs::path g_exePath;
