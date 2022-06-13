@@ -448,6 +448,8 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 						fs::create_directories(path.parent_path());
 						CreateWTD(g_gamePath / FontsPathTLAD, path, dxt5Img);
 					}
+
+					TaskDialog(hDlg, nullptr, L"CWTDGen", nullptr, L"生成成功", TDCBF_OK_BUTTON, TD_INFORMATION_ICON, nullptr);
 				}
 				catch (...)
 				{
