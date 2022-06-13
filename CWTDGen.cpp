@@ -288,6 +288,8 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 		SetWindowLongW(s_hPreview, GWL_STYLE, style | WS_BORDER);
 		SetWindowPos(s_hPreview, nullptr, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
 
+		SetDlgItemTextW(hDlg, IDC_PREVIEW_TEXT, L"测试文本");
+
 		return static_cast<INT_PTR>(TRUE);
 	}
 	case WM_COMMAND:
