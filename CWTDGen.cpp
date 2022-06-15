@@ -68,6 +68,11 @@ bool CheckAndFixGTAIVPath(fs::path& path)
 	return true;
 }
 
+bool CheckCHSFiles(const fs::path& path)
+{
+	return fs::is_regular_file(path / CharTableDatPath);
+}
+
 bool CheckFontSelected(HWND hWnd)
 {
 	if (!g_font.lfFaceName[0] || !g_symbolFont.lfFaceName[0])
@@ -90,9 +95,9 @@ bool CheckGamePathSelected(HWND hWnd)
 
 bool CheckCharTableDat(HWND hWnd)
 {
-	if (!fs::is_regular_file(g_gamePath / CharTableDatPath))
+	if (!CheckCHSFiles(g_gamePath))
 	{
-		TaskDialog(hWnd, nullptr, L"CWTDGen", nullptr, L"游戏目录下找不到 char_table.dat，请确认已正确安装汉化补丁", TDCBF_OK_BUTTON, TD_WARNING_ICON, nullptr);
+		TaskDialog(hWnd, nullptr, L"CWTDGen", nullptr, L"游戏目录下找不到 char_table.dat，请确认已安装汉化补丁。", TDCBF_OK_BUTTON, TD_WARNING_ICON, nullptr);
 		return false;
 	}
 	return true;
@@ -344,22 +349,24 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 				buf.clear();
 			} while (0);
 
-			bool found = false;
 			if (!buf.empty())
 			{
 				fs::path path(std::move(buf));
 				if (CheckAndFixGTAIVPath(path))
 				{
-					g_gamePath = std::move(path);
-					found = true;
-					SetDlgItemTextW(hDlg, IDC_GAMEDIR, g_gamePath.c_str());
+					if (CheckCHSFiles(path))
+					{
+						g_gamePath = std::move(path);
+						SetDlgItemTextW(hDlg, IDC_GAMEDIR, g_gamePath.c_str());
+					}
+					else
+						TaskDialog(hDlg, nullptr, L"CWTDGen", nullptr, L"找到游戏目录，但缺少 char_table.dat。\n请确认已安装汉化补丁。", TDCBF_OK_BUTTON, TD_WARNING_ICON, nullptr);
 				}
+				else
+					TaskDialog(hDlg, nullptr, L"CWTDGen", nullptr, L"找到游戏目录，但缺少 fonts.wtd。\n请确认已正确安装游戏，可尝试验证完整性。", TDCBF_OK_BUTTON, TD_WARNING_ICON, nullptr);
 			}
-
-			if (!found)
-			{
+			else
 				TaskDialog(hDlg, nullptr, L"CWTDGen", nullptr, L"无法找到游戏目录，请手动选择", TDCBF_OK_BUTTON, TD_WARNING_ICON, nullptr);
-			}
 		}
 		break;
 		case IDM_SELECT_DIR:
@@ -383,11 +390,16 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 				fs::path path(pathStr.get());
 				if (CheckAndFixGTAIVPath(path))
 				{
-					g_gamePath = std::move(path);
-					SetDlgItemTextW(hDlg, IDC_GAMEDIR, g_gamePath.c_str());
+					if (CheckCHSFiles(path))
+					{
+						g_gamePath = std::move(path);
+						SetDlgItemTextW(hDlg, IDC_GAMEDIR, g_gamePath.c_str());
+					}
+					else
+						TaskDialog(hDlg, nullptr, L"CWTDGen", nullptr, L"选择的目录下未找到 char_table.dat。\n请确认已安装汉化补丁。", TDCBF_OK_BUTTON, TD_WARNING_ICON, nullptr);
 				}
 				else
-					TaskDialog(hDlg, nullptr, L"CWTDGen", nullptr, L"选择的目录下未找到贴图文件", TDCBF_OK_BUTTON, TD_WARNING_ICON, nullptr);
+					TaskDialog(hDlg, nullptr, L"CWTDGen", nullptr, L"选择的目录下未找到 fonts.wtd。", TDCBF_OK_BUTTON, TD_WARNING_ICON, nullptr);
 			}
 			CATCH_LOG();
 		}
