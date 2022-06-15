@@ -147,3 +147,14 @@ uint32_t Log2Ceil(uint32_t x)
 {
 	return Log2(x - 1) + 1;
 }
+
+template<size_t N>
+constexpr bool IsWCharInRanges(const std::pair<wchar_t, wchar_t> (&ranges)[N], wchar_t ch)
+{
+	for (const auto& range : ranges)
+	{
+		if (range.first <= ch && ch <= range.second)
+			return true;
+	}
+	return false;
+}

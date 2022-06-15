@@ -11,7 +11,11 @@ constexpr uint32_t CharWidth = 64;
 constexpr uint32_t CharHeight = 66;
 constexpr uint32_t TextureXChars = TextureWidth / CharWidth;
 constexpr uint32_t TextureYChars = TextureHeight / CharHeight;
-static const std::unordered_set<wchar_t> SymbolSet = { L'—', L'　', L'、', L'。', L'《', L'》', L'「', L'」', L'『', L'』', L'！', L'，', L'－', L'．', L'：', L'；', L'？', L'～' };
+constexpr std::pair<wchar_t, wchar_t> NonSymbolRange[] = {
+	{ L'\u4E00', L'\u9FFF' }, // 中日韩统一表意文字
+	{ L'\uFF10', L'\uFF19' }, // 全角0-9
+	{ L'\uFF41', L'\uFF5A' }  // 全角a-z
+};
 static const std::unordered_set<wchar_t> IgnoreSet = { L'\n', L'\r' };
 static const std::unordered_map<wchar_t, wchar_t> ReplaceMap = { {L'「', L'“'}, {L'」', L'”'}, {L'『', L'‘'}, {L'』', L'’'} };
 

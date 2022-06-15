@@ -121,7 +121,7 @@ void GDIDrawCharacters(HDC hdc, std::wstring_view text, uint32_t xChars, uint32_
 	{
 		for (uint32_t x = 0; x < xChars && i < text.size(); ++x, ++i)
 		{
-			bool isSymbol = SymbolSet.contains(text[i]);
+			bool isSymbol = !IsWCharInRanges(NonSymbolRange, text[i]);
 			if (isSymbol != symbolFontSelected)
 			{
 				SelectObject(hdc, isSymbol ? hSymbolFont.get() : hFont.get());
@@ -167,7 +167,7 @@ void GpDrawCharacters(HDC hdc, std::wstring_view text, uint32_t xChars, uint32_t
 			while (i < text.size() && IgnoreSet.contains(text[i]))
 				++i;
 
-			bool isSymbol = SymbolSet.contains(text[i]);
+			bool isSymbol = !IsWCharInRanges(NonSymbolRange, text[i]);
 
 			Gp::RectF rect(static_cast<Gp::REAL>(x * CharWidth), static_cast<Gp::REAL>(y * CharHeight), CharWidth, CharHeight);
 
@@ -206,7 +206,7 @@ void DWriteDrawCharacters(ID2D1RenderTarget* renderTarget, std::wstring_view tex
 			while (i < text.size() && IgnoreSet.contains(text[i]))
 				++i;
 
-			bool isSymbol = SymbolSet.contains(text[i]);
+			bool isSymbol = !IsWCharInRanges(NonSymbolRange, text[i]);
 
 			D2D1_RECT_F rect;
 			rect.left = static_cast<float>(x * CharWidth);
