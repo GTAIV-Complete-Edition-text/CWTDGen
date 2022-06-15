@@ -241,11 +241,6 @@ void CreateWTD(const fs::path& in, const fs::path& out, const DirectX::ScratchIm
 
 	auto hash = RageUtil::HashString("font_chs");
 
-	auto begin = dict->hashes.data.Get();
-	auto end = begin + dict->hashes.size;
-	if (std::find(begin, end, hash) != end)
-		THROW_HR(E_INVALIDARG);
-
 	auto texture = *dict->values.data.Get()->Get(); // copy
 	texture.name.Set("pack:/font_chs.dds");
 	texture.width = TextureWidth;
@@ -256,7 +251,20 @@ void CreateWTD(const fs::path& in, const fs::path& out, const DirectX::ScratchIm
 	texture.prev = 0;
 	texture.pixelData.Set(dxt5Img.GetPixels());
 
-	auto containers = dict->Insert(hash, &texture);
+	std::span<uint32_t> hashes(dict->hashes.data.Get(), dict->hashes.size);
+	auto it = std::find(hashes.begin(), hashes.end(), hash);
+
+	RageUtil::pgDictionary<RageUtil::grcTexturePC>::TContainer containers;
+	if (it != hashes.end())
+	{
+		auto pos = std::distance(hashes.begin(), it);
+		auto ptr = dict->values.data.Get() + pos;
+		ptr->Set(&texture);
+	}
+	else
+	{
+		containers = dict->Insert(hash, &texture);
+	}
 
 	RageUtil::RSC5::BlockList blockList;
 	blockList.AppendVirtual(dict, sizeof(*dict), nullptr);

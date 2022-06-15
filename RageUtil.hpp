@@ -351,6 +351,8 @@ namespace RageUtil
 	template<typename T>
 	struct pgArray
 	{
+		using TInsertContainer = std::vector<T>;
+
 		pgPtrT<T> data;
 		uint16_t size;
 		uint16_t capacity;
@@ -358,7 +360,7 @@ namespace RageUtil
 		[[nodiscard]] auto InsertSorted(T value)
 		{
 			auto ptr = data.Get();
-			std::vector<T> container;
+			TInsertContainer container;
 			container.reserve(static_cast<size_t>(size) + 1);
 			container.assign(ptr, ptr + size);
 
@@ -377,7 +379,7 @@ namespace RageUtil
 		[[nodiscard]] auto InsertAt(size_t pos, T value)
 		{
 			auto ptr = data.Get();
-			std::vector<T> container;
+			TInsertContainer container;
 			container.reserve(static_cast<size_t>(size) + 1);
 			container.assign(ptr, ptr + size);
 			container.insert(container.cbegin() + pos, value);
@@ -463,12 +465,18 @@ namespace RageUtil
 	template<typename T>
 	struct pgDictionary : public pgBase
 	{
+		using THash = pgArray<uint32_t>;
+		using TValue = pgObjectArray<T>;
+		using THashContainer = THash::TInsertContainer;
+		using TValueContainer = TValue::TInsertContainer;
+		using TContainer = std::pair<THashContainer, TValueContainer>;
+
 		pgPtrT<pgBase> parent;
 		uint32_t usageCount;
-		pgArray<uint32_t> hashes;
-		pgObjectArray<T> values;
+		THash hashes;
+		TValue values;
 
-		[[nodiscard]] auto Insert(uint32_t hash, T* value)
+		[[nodiscard]] TContainer Insert(uint32_t hash, T* value)
 		{
 			auto [hashContainer, pos] = hashes.InsertSorted(hash);
 			pgPtrT<T> ptr;
