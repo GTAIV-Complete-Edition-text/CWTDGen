@@ -22,6 +22,7 @@
 #define IDC_GENERATE_PREVIEW            1016
 #define IDC_GENERATE                    1017
 #define IDM_SELECT_DIR                  1018
+#define IDM_OPEN_DIR                    1019
 #define IDC_STATIC                      -1
 
 // Next default values for new objects

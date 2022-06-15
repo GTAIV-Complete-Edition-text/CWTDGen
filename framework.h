@@ -12,6 +12,7 @@
 #include <d2d1.h>
 #include <dwrite.h>
 #include <d3d9types.h> // for D3DFORMAT
+#include <shellapi.h>
 
 // Fix gdiplustypes.h requires min/max
 #include <algorithm>

@@ -404,6 +404,9 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 			CATCH_LOG();
 		}
 		break;
+		case IDM_OPEN_DIR:
+			ShellExecuteW(hDlg, nullptr, g_gamePath.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+			break;
 		case IDC_GENERATE_PREVIEW:
 			if (CheckFontSelected(hDlg))
 			{
@@ -492,6 +495,7 @@ INT_PTR CALLBACK DialogProc(HWND hDlg, UINT message, WPARAM wParam, [[maybe_unus
 
 			wil::unique_hmenu hMenu(CreatePopupMenu());
 			AppendMenuW(hMenu.get(), 0, IDM_SELECT_DIR, L"手动选择...");
+			AppendMenuW(hMenu.get(), g_gamePath.empty() ? MF_DISABLED | MF_GRAYED : 0, IDM_OPEN_DIR, L"打开选择的文件夹");
 			TrackPopupMenu(hMenu.get(), TPM_LEFTALIGN | TPM_TOPALIGN, pt.x, pt.y, 0, hDlg, nullptr);
 		}
 		break;
