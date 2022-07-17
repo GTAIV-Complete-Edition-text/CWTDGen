@@ -234,8 +234,8 @@ void CreateWTD(const fs::path& in, const fs::path& out, const DirectX::ScratchIm
 	THROW_LAST_ERROR_IF(!hFile);
 
 	auto [header, data] = RageUtil::RSC5::ReadFromFile(hFile.get());
-	RageUtil::s_virtual = { data.get(), header.GetVirtualSize() };
-	RageUtil::s_physical = { data.get() + RageUtil::s_virtual.size(), header.GetPhysicalSize() };
+	RageUtil::s_virtual = { data.get(), header.flags.GetVirtualSize() };
+	RageUtil::s_physical = { data.get() + RageUtil::s_virtual.size(), header.flags.GetPhysicalSize() };
 
 	auto dict = reinterpret_cast<RageUtil::pgDictionary<RageUtil::grcTexturePC>*>(data.get());
 

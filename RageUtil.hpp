@@ -122,7 +122,18 @@ namespace RageUtil
 		{
 			RSC5Flags flags;
 			uint32_t uint32;
+
+			uint32_t GetVirtualSize() const
+			{
+				return (uint32 & 0x7FF) << (((uint32 >> 11) & 0xF) + 8);
+			}
+
+			uint32_t GetPhysicalSize() const
+			{
+				return ((uint32 >> 15) & 0x7FF) << (((uint32 >> 26) & 0xF) + 8);
+			}
 		};
+		static_assert(sizeof(RSC5FlagsUint32) == 4);
 
 		struct Header
 		{
@@ -130,17 +141,7 @@ namespace RageUtil
 
 			uint32_t magic;
 			ResourceType type;
-			uint32_t flags;
-
-			uint32_t GetVirtualSize() const
-			{
-				return (flags & 0x7FF) << (((flags >> 11) & 0xF) + 8);
-			}
-
-			uint32_t GetPhysicalSize() const
-			{
-				return ((flags >> 15) & 0x7FF) << (((flags >> 26) & 0xF) + 8);
-			}
+			RSC5FlagsUint32 flags;
 		};
 		static_assert(sizeof(Header) == 12);
 
@@ -194,7 +195,7 @@ namespace RageUtil
 			THROW_HR_IF(E_INVALIDARG, header.magic != Header::MagicValue);
 			THROW_HR_IF(E_INVALIDARG, header.type != ResourceType::Texture);
 
-			uint32_t decodedSize = header.GetVirtualSize() + header.GetPhysicalSize();
+			uint32_t decodedSize = header.flags.GetVirtualSize() + header.flags.GetPhysicalSize();
 			auto decoded = std::make_unique<uint8_t[]>(decodedSize);
 
 			unique_z_stream_inflate strm;
@@ -221,7 +222,7 @@ namespace RageUtil
 
 		constexpr uint8_t PadByte = 0xcd;
 
-		uint32_t SortAndCalculateFlags(BlockList& blockList)
+		RSC5FlagsUint32 SortAndCalculateFlags(BlockList& blockList)
 		{
 			RSC5FlagsUint32 f;
 			f.uint32 = 0;
@@ -295,12 +296,13 @@ namespace RageUtil
 			f.flags.pBlock4Count = levelsCount[4];
 			f.flags.pBlockSize = phyBlockSize - 8;
 
-			return f.uint32;
+			return f;
 		}
 
 		auto DumpToFile(HANDLE hFile, Header& header, [[maybe_unused]] BlockList& blockList)
 		{
-			header.flags = (header.flags & 0xc0000000) | SortAndCalculateFlags(blockList);
+			auto flags = SortAndCalculateFlags(blockList);
+			header.flags.uint32 = (header.flags.uint32 & 0xc0000000) | flags.uint32;
 			WriteFileCheckSize(hFile, &header, sizeof(header));
 
 			unique_z_stream_deflate strm;
@@ -329,20 +331,22 @@ namespace RageUtil
 			uint32_t virtualSize = 0;
 			for (auto& b : blockList.virtualBlocks)
 			{
+				const auto fullSize = RoundUp<16>(b.size);
 				DeflateWrite(b.data, b.size);
-				auto padSize = RoundUp<16>(b.size) - b.size;
-				WritePadBytes(padSize);
-				virtualSize += RoundUp<16>(b.size);
+				WritePadBytes(fullSize - b.size);
+				virtualSize += fullSize;
 			}
+			WritePadBytes(flags.GetVirtualSize() - virtualSize);
 
-			WritePadBytes(4096 - virtualSize);
-
+			uint32_t physicalSize = 0;
 			for (auto& b : blockList.physicalBlocks)
 			{
+				const auto fullSize = RoundUp<16>(b.size);
 				DeflateWrite(b.data, b.size);
-				auto padSize = RoundUp<16>(b.size) - b.size;
-				WritePadBytes(padSize);
+				WritePadBytes(fullSize - b.size);
+				physicalSize += fullSize;
 			}
+			WritePadBytes(flags.GetPhysicalSize() - physicalSize);
 
 			DeflateWrite(nullptr, 0, true);
 		}
