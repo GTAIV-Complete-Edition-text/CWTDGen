@@ -321,9 +321,9 @@ namespace RageUtil
 			};
 			auto WritePadBytes = [&DeflateWrite](size_t size) {
 				if (size == 0) return;
-				uint8_t buf[4096];
-				std::fill_n(buf, std::min(size, std::size(buf)), PadByte);
-				DeflateWrite(buf, size);
+				auto buf = std::make_unique_for_overwrite<uint8_t[]>(size);
+				std::fill_n(buf.get(), size, PadByte);
+				DeflateWrite(buf.get(), size);
 			};
 
 			uint32_t virtualSize = 0;
