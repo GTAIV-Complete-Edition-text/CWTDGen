@@ -22,9 +22,9 @@ static const std::unordered_map<wchar_t, wchar_t> ReplaceMap = { {L'「', L'“'
 constexpr auto FontsPathIV = LR"(pc\textures\fonts.wtd)";
 constexpr auto FontsPathTBoGT = LR"(TBoGT\pc\textures\fonts.wtd)";
 constexpr auto FontsPathTLAD = LR"(TLAD\pc\textures\fonts.wtd)";
-constexpr auto NewFontsPathIV = FontsPathIV;
-constexpr auto NewFontsPathTBoGT = FontsPathTBoGT;
-constexpr auto NewFontsPathTLAD = FontsPathTLAD;
+constexpr auto NewFontsPathIV = LR"(pc\textures\fonts_chs.wtd)";
+constexpr auto NewFontsPathTBoGT = LR"(TBoGT\pc\textures\fonts_chs.wtd)";
+constexpr auto NewFontsPathTLAD = LR"(TLAD\pc\textures\fonts_chs.wtd)";
 constexpr auto CharTableDatPath = LR"(plugins\GTA4.CHS\char_table.dat)";
 
 HINSTANCE g_hInst;
